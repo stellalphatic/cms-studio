@@ -4,13 +4,22 @@ How to onboard a new site into the Studio CMS in under 30 minutes.
 
 ## TL;DR
 
-1. Add a row to `sites` (Studio Admin or SQL).
-2. Generate an API key in Studio → API Keys.
-3. Drop `studio-cms.ts` (or install `@studio/cms`) into the new site.
-4. Build a `scripts/fetch-content.ts` that pulls at build time.
-5. Wire the Amplify build webhook so content publishes trigger rebuilds.
+1. **Create the workspace.** Studio → Admin → Sites → "New site".
+2. **Mint a key.** Open the new workspace → API Keys → "Create key". Copy
+   the secret (you only see it once).
+3. **Open the Integration page.** Studio → workspace → **Integration**.
+   Copy the env block that matches your framework (Vite, Astro, Next.js)
+   into your site's `.env`.
+4. **Vendor or install the SDK** (`studio/packages/sdk/studio-cms.ts`).
+5. **Add a `prefetch` step** to your build (`scripts/fetch-content.ts`) so
+   your bundler ships static content.
+6. **Wire a deploy hook** in your host (Vercel / Amplify / Netlify /
+   Cloudflare / Render) and paste the URL into Studio → workspace →
+   Settings → "Deploy hook URL".
 
-That's the whole story. Read on for details.
+That's the whole story. Read on for details — or hand
+`docs/AGENT_INTEGRATION_PROMPT.md` to an AI coding agent and watch it do
+the work.
 
 ---
 
@@ -18,17 +27,18 @@ That's the whole story. Read on for details.
 
 **Studio** (Next.js, deployed to Vercel) is the only thing connected to
 Postgres/Supabase. Editors log in, write content, click "Publish". Studio
-fires a debounced webhook to AWS Amplify; Amplify rebuilds the site; the new
-build pulls the content via the Studio public API at build time and bakes it
-into static HTML on CloudFront. End users never touch a database — every
-page is pre-rendered, fully cached, instant TTFB, perfect Lighthouse.
+fires a debounced deploy-hook POST to **your host of choice** (Vercel,
+Amplify, Netlify, Cloudflare Pages, Render); that host rebuilds the site;
+the build pulls content via the Studio public API at build time and bakes
+it into static HTML on the host's CDN. End users never touch a database —
+every page is pre-rendered, fully cached, instant TTFB, perfect Lighthouse.
 
 ```
-┌─────────┐ writes  ┌──────────────┐ webhook  ┌─────────┐ pull   ┌──────────┐
-│ Editor  │────────▶│  Studio CMS  │─────────▶│ Amplify │───────▶│ Public   │
-└─────────┘         │   (Vercel)   │          │         │  API   │ HTML on  │
-                    │   Supabase   │          │  build  │◀───────│ CloudFr. │
-                    └──────────────┘          └─────────┘        └──────────┘
+┌─────────┐ writes  ┌──────────────┐ deploy  ┌──────────┐ pull   ┌──────────┐
+│ Editor  │────────▶│  Studio CMS  │────────▶│  Host    │───────▶│ Public   │
+└─────────┘         │   (Vercel)   │  hook   │ rebuilds │  API   │ HTML on  │
+                    │   Supabase   │         │          │◀───────│  CDN     │
+                    └──────────────┘         └──────────┘        └──────────┘
 ```
 
 ## 2. Add a new site in Studio
@@ -146,24 +156,50 @@ export default async function Blog() {
 }
 ```
 
-### D. Add env vars to AWS Amplify
+### D. Add env vars to your host
 
-In the Amplify console for the new site → App settings → Environment
-variables:
+The exact variable block is generated for you in
+**Studio → workspace → Integration**. Copy the section that matches your
+framework, paste it into your host's environment-variables page, and replace
+`<paste-the-secret-from-API-Keys>` with the secret you copied in step 3.
+
+Reference (the Integration page tailors these to *your* Studio URL):
 
 ```
-CMS_URL=https://admin.yourdomain.com
-CMS_API_KEY=sk_live_xxx          # the secret you copied in step 3
+# Vite (Kingsbridge, SearchHub, Clona)
+VITE_CMS_URL=https://your-studio.example.com
+VITE_CMS_SITE=acme
+VITE_CMS_API_KEY=sk_live_xxx
+VITE_FORMS_URL=https://YOUR-PROJECT.functions.supabase.co/submit-form
+VITE_FORMS_SITE=acme
+VITE_TURNSTILE_SITE_KEY=0x4AAAAA…
+
+# Astro (Vantage)
+CMS_URL=…   CMS_SITE=acme   CMS_API_KEY=sk_live_xxx
+PUBLIC_FORMS_URL=…           PUBLIC_FORMS_SITE=acme
+PUBLIC_TURNSTILE_SITE_KEY=…
+
+# Next.js (future sites)
+NEXT_PUBLIC_CMS_URL=…        NEXT_PUBLIC_CMS_SITE=acme   CMS_API_KEY=sk_live_xxx
+NEXT_PUBLIC_FORMS_URL=…      NEXT_PUBLIC_FORMS_SITE=acme
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=…
 ```
 
-### E. Wire the publish-rebuild webhook
+### E. Wire the publish-rebuild deploy hook
 
-In Amplify → App settings → Build settings → **Incoming webhooks** →
-create one for `main` → copy the URL. Paste into Studio → `acme` →
-Settings → "Amplify webhook URL". Save.
+Studio supports any host that exposes a plain POST-able deploy hook URL:
 
-Now any "Publish" in Studio triggers a rebuild within 30 seconds (debounce
-prevents storms when an editor publishes 5 posts in a row).
+| Host                 | Where to create the hook |
+|----------------------|--------------------------|
+| **Vercel**           | Project → Settings → Git → *Deploy Hooks* |
+| **AWS Amplify**      | App settings → Build settings → *Incoming webhooks* |
+| **Netlify**          | Site settings → Build & deploy → *Build hooks* |
+| **Cloudflare Pages** | Project → Settings → Builds & deployments → *Deploy hooks* |
+| **Render**           | Service → Settings → *Deploy hook* |
+
+Copy the URL, paste into Studio → workspace → Settings → "Deploy hook URL",
+save. Now any "Publish" in Studio triggers a rebuild within ~30 seconds
+(debounce prevents storms when an editor publishes 5 posts in a row).
 
 ## 5. Forms
 

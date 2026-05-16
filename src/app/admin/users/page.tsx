@@ -1,13 +1,17 @@
+import { ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
+import { DataTable, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { formatDate } from "@/lib/utils";
 import { AdminToggle } from "./admin-toggle";
+import { PlatformInviteForm } from "./invite-form";
 
 interface ProfileRow {
   id: string;
   email: string;
   full_name: string | null;
+  avatar_url: string | null;
   is_platform_admin: boolean;
   created_at: string;
 }
@@ -15,8 +19,6 @@ interface ProfileRow {
 interface MembershipRow {
   user_id: string;
   role: string;
-  // Supabase can return the joined `site` as a single row OR as an array
-  // depending on the relationship type. Handle both shapes below.
   site: { slug: string; name: string } | { slug: string; name: string }[] | null;
 }
 
@@ -25,7 +27,7 @@ export default async function AdminUsersPage() {
   const sb = createSupabaseAdminClient();
   const { data: profiles } = await sb
     .from("profiles")
-    .select("id, email, full_name, is_platform_admin, created_at")
+    .select("id, email, full_name, avatar_url, is_platform_admin, created_at")
     .order("created_at", { ascending: true });
 
   const { data: memberships } = await sb
@@ -42,41 +44,89 @@ export default async function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
-        title="Users"
-        description="Every user across the platform. Promote teammates to platform admin to give them super-admin powers (create sites, invite anywhere)."
+        title="People"
+        description="Every user across the platform. Promote teammates to platform admin to give them super-admin powers (see every site, create new ones, manage API keys)."
+        eyebrow="Admin"
       />
 
-      <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-[var(--color-bg)] text-left text-xs uppercase tracking-wide text-[var(--color-fg-muted)]">
-            <tr>
-              <th className="px-4 py-3 font-medium">User</th>
-              <th className="px-4 py-3 font-medium">Workspaces</th>
-              <th className="px-4 py-3 font-medium">Joined</th>
-              <th className="px-4 py-3 font-medium">Role</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--color-border)]">
-            {(profiles as ProfileRow[] | null)?.map((p) => (
-              <tr key={p.id}>
-                <td className="px-4 py-3">
-                  <div className="font-medium">{p.full_name ?? p.email.split("@")[0]}</div>
-                  <div className="text-xs text-[var(--color-fg-muted)]">{p.email}</div>
-                </td>
-                <td className="px-4 py-3 text-xs text-[var(--color-fg-muted)]">
-                  {(memberMap.get(p.id) ?? []).map((m) => `${m.name} (${m.role})`).join(", ") || "—"}
-                </td>
-                <td className="px-4 py-3 text-xs text-[var(--color-fg-muted)]">{formatDate(p.created_at)}</td>
-                <td className="px-4 py-3">
+      <PlatformInviteForm />
+
+      <DataTable>
+        <THead>
+          <TR>
+            <TH>User</TH>
+            <TH>Workspaces</TH>
+            <TH align="right">Joined</TH>
+            <TH align="right">Platform admin</TH>
+          </TR>
+        </THead>
+        <TBody>
+          {(profiles as ProfileRow[] | null)?.map((p) => {
+            const mems = memberMap.get(p.id) ?? [];
+            const initial = (p.full_name ?? p.email).charAt(0).toUpperCase();
+            return (
+              <TR key={p.id}>
+                <TD>
+                  <div className="flex items-center gap-2.5">
+                    {p.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={p.avatar_url}
+                        alt=""
+                        className="h-8 w-8 rounded-full object-cover ring-1 ring-[var(--color-border)]"
+                      />
+                    ) : (
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--color-surface-2)] text-[11px] font-semibold text-[var(--color-fg-muted)]">
+                        {initial}
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <div className="text-[13.5px] font-medium">
+                        {p.full_name ?? p.email.split("@")[0]}
+                        {p.is_platform_admin && (
+                          <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-[var(--color-brand-50)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-brand)]">
+                            <ShieldCheck className="h-2.5 w-2.5" /> Admin
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono text-[11px] text-[var(--color-fg-subtle)]">
+                        {p.email}
+                      </div>
+                    </div>
+                  </div>
+                </TD>
+                <TD>
+                  {mems.length === 0 ? (
+                    <span className="text-[var(--color-fg-subtle)]">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {mems.map((m) => (
+                        <span
+                          key={m.slug + m.role}
+                          className="inline-flex items-center gap-1 rounded-md bg-[var(--color-surface-2)] px-1.5 py-0.5 text-[11px]"
+                        >
+                          <span className="font-medium">{m.name}</span>
+                          <span className="font-mono uppercase tracking-wider text-[var(--color-fg-subtle)]">
+                            {m.role}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </TD>
+                <TD muted align="right" mono>
+                  {formatDate(p.created_at)}
+                </TD>
+                <TD align="right">
                   <AdminToggle userId={p.id} initial={p.is_platform_admin} selfId={ctx.user.id} />
-                </td>
-              </tr>
-            )) ?? null}
-          </tbody>
-        </table>
-      </div>
+                </TD>
+              </TR>
+            );
+          }) ?? null}
+        </TBody>
+      </DataTable>
     </div>
   );
 }

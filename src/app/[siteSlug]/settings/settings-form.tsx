@@ -125,18 +125,51 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
 
       <SettingSection
         title="Build webhook"
-        description="POSTed when published content changes (debounced ~30s). Find this in AWS Amplify → App settings → Build settings → Incoming webhooks."
+        description="A POST-only URL Studio calls to trigger a deploy of the public site. Works with Amplify, Vercel, Netlify, Cloudflare Pages and Render. POSTs are debounced ~30s so a burst of saves triggers one rebuild."
       >
-        <Field label="Amplify webhook URL">
+        <Field
+          label="Deploy hook URL"
+          hint="Any platform that exposes a POST-able build/deploy hook"
+        >
           <Input
             name="amplify_webhook_url"
             defaultValue={site.amplify_webhook_url ?? ""}
             disabled={!canEdit}
-            placeholder="https://webhooks.amplify.us-east-1.amazonaws.com/prod/webhooks?id=..."
+            placeholder="https://api.vercel.com/v1/integrations/deploy/prj_…/…"
             type="url"
             className="font-mono text-[12px]"
           />
         </Field>
+        <details className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)]/50 px-3 py-2 text-[12.5px] leading-relaxed text-[var(--color-fg-muted)]">
+          <summary className="cursor-pointer font-medium text-[var(--color-fg)]">
+            Where do I get this URL?
+          </summary>
+          <ul className="mt-2 space-y-1.5">
+            <li>
+              <span className="font-medium text-[var(--color-fg)]">Vercel:</span>{" "}
+              Project → Settings → Git → <span className="font-mono">Deploy Hooks</span>. Name it
+              <span className="font-mono"> CMS</span>, pick the branch, copy the URL.
+            </li>
+            <li>
+              <span className="font-medium text-[var(--color-fg)]">AWS Amplify:</span>{" "}
+              App settings → Build settings → <span className="font-mono">Incoming webhooks</span> →
+              Create webhook → copy URL.
+            </li>
+            <li>
+              <span className="font-medium text-[var(--color-fg)]">Netlify:</span>{" "}
+              Site settings → Build &amp; deploy → Continuous deployment →{" "}
+              <span className="font-mono">Build hooks</span> → Add build hook.
+            </li>
+            <li>
+              <span className="font-medium text-[var(--color-fg)]">Cloudflare Pages:</span>{" "}
+              Project → Settings → Builds &amp; deployments → <span className="font-mono">Deploy hooks</span>.
+            </li>
+            <li>
+              <span className="font-medium text-[var(--color-fg)]">Render:</span>{" "}
+              Service → Settings → <span className="font-mono">Deploy hook</span>.
+            </li>
+          </ul>
+        </details>
       </SettingSection>
 
       <SettingSection

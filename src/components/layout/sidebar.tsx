@@ -11,6 +11,7 @@ import {
   Layers,
   Layout as LayoutIcon,
   LayoutDashboard,
+  Plug,
   Quote,
   Route,
   Settings,
@@ -125,6 +126,7 @@ export function Sidebar({
           <Section label="Manage">
             <SidebarNav href={`/${site.slug}/people`} icon={Users} label="People" />
             <SidebarNav href={`/${site.slug}/api-keys`} icon={KeyRound} label="API keys" />
+            <SidebarNav href={`/${site.slug}/integration`} icon={Plug} label="Integration" />
             <SidebarNav href={`/${site.slug}/settings`} icon={Settings} label="Settings" />
           </Section>
         )}
