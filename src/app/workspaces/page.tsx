@@ -1,12 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { getWhitelabelSite } from "@/lib/host";
 import { StudioWordmark } from "@/components/brand/studio-mark";
 
 export const metadata = { title: "Workspaces" };
 
 export default async function WorkspacesPage() {
   const ctx = await requireUser();
+  const whitelabel = await getWhitelabelSite();
+  if (whitelabel) redirect(`/${whitelabel.slug}`);
 
   return (
     <div className="min-h-svh bg-[var(--color-bg)]">

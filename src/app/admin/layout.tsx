@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, LogOut, ShieldCheck, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { getWhitelabelSite } from "@/lib/host";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { StudioMark } from "@/components/brand/studio-mark";
 
@@ -10,6 +11,10 @@ export const metadata = { title: "Platform Admin · Studio" };
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireUser();
   if (!ctx.profile.is_platform_admin) redirect("/");
+  // Platform admin only on the master domain. On client whitelabel hosts,
+  // bounce back to the home which middleware then re-pins to their workspace.
+  const whitelabel = await getWhitelabelSite();
+  if (whitelabel) redirect("/");
 
   return (
     <div className="min-h-svh bg-[var(--color-bg)]">

@@ -8,11 +8,13 @@ export function Topbar({
   role,
   user,
   allMemberships,
+  isWhitelabel = false,
 }: {
   site: Site;
   role: SiteRole;
   user: { email: string; fullName: string | null };
   allMemberships: Array<{ site: Site; role: SiteRole }>;
+  isWhitelabel?: boolean;
 }) {
   return (
     <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 px-6 backdrop-blur">
@@ -46,11 +48,13 @@ export function Topbar({
                 </li>
               ))}
             </ul>
-            <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-xs">
-              <Link href="/workspaces" className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]">
-                See all workspaces →
-              </Link>
-            </div>
+            {!isWhitelabel && (
+              <div className="border-t border-[var(--color-border)] bg-[var(--color-surface-2)] px-3 py-2 text-xs">
+                <Link href="/workspaces" className="text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]">
+                  See all workspaces →
+                </Link>
+              </div>
+            )}
           </div>
         </details>
 

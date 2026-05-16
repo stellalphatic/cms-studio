@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { hasRole, requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { invalidateWhitelabelCache } from "@/lib/host";
 import { logAudit } from "@/lib/audit";
 
 const settingsSchema = z.object({
@@ -74,5 +75,8 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
     entity_id: site.id,
   });
 
+  // The middleware + workspace layout cache host→site mappings for 60s.
+  // Invalidate so a freshly-saved CMS subdomain takes effect immediately.
+  invalidateWhitelabelCache();
   revalidatePath(`/${siteSlug}/settings`);
 }
