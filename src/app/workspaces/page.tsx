@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Building2, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
+import { StudioWordmark } from "@/components/brand/studio-mark";
 
 export const metadata = { title: "Workspaces" };
 
@@ -11,10 +12,7 @@ export default async function WorkspacesPage() {
     <div className="min-h-svh bg-[var(--color-bg)]">
       <header className="border-b border-[var(--color-border)] bg-[var(--color-surface)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-lg bg-[var(--color-brand)] text-[var(--color-brand-fg)] text-sm font-semibold">S</div>
-            <div className="text-sm font-semibold tracking-tight">Studio</div>
-          </div>
+          <StudioWordmark size={32} />
           <div className="flex items-center gap-2">
             {ctx.profile.is_platform_admin && (
               <Link

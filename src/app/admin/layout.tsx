@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Building2, LogOut, ShieldCheck, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { StudioMark } from "@/components/brand/studio-mark";
 
 export const metadata = { title: "Platform Admin · Studio" };
 
@@ -14,8 +15,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="min-h-svh bg-[var(--color-bg)]">
       <header className="sticky top-0 z-20 flex h-14 items-center justify-between gap-4 border-b border-[var(--color-border)] bg-[var(--color-surface)]/95 px-6 backdrop-blur">
         <Link href="/admin" className="flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck className="h-4 w-4 text-[var(--color-brand)]" />
-          Studio · Platform Admin
+          <StudioMark size={22} />
+          <span>Studio · Platform Admin</span>
         </Link>
         <div className="flex items-center gap-2">
           <Link

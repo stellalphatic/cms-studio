@@ -143,20 +143,53 @@ git push -u origin main
 
 ## 6. Become the first super-admin
 
-1. Open the Vercel URL → **Sign up** with your real email.
-2. The migration trigger from `0003_bootstrap_admin.sql` automatically:
-   - Marks you as `is_platform_admin = true`
-   - Grants you `owner` on all four sites (searchhub, kingsbridge, vantage, clona)
-3. After signing up, you'll see four workspace cards. Top-right also shows a
-   **Platform admin** button that lands you at `/admin` — your super-admin view.
+There are **two ways** — pick whichever works for you. The bootstrap trigger
+(`0003_bootstrap_admin.sql`) fires either way and promotes the first user
+to platform admin + owner of every site.
 
-> **Verify in SQL** if you want:
-> ```sql
-> select email, is_platform_admin from public.profiles;
-> ```
+### Option A — Add yourself via the Supabase Dashboard (fastest, no email needed)
 
-> **CRITICAL:** Don't share the Vercel URL until you've done this signup.
-> Otherwise whoever signs up first will become super-admin.
+This is the recommended path because it works even before you've configured
+SMTP / email confirmation.
+
+1. Supabase Dashboard → **Authentication → Users** → **Add user → Create new user**.
+2. Email: your real address. Password: pick something strong. **Tick
+   "Auto Confirm User"** so you can sign in immediately (no confirmation
+   email required).
+3. Open your Vercel URL → enter the same email + password → **Sign in**.
+
+### Option B — Sign up from the Studio login page
+
+The login page shows a **Create account** tab automatically *only when there
+are zero users in the database* (true on first deploy). After that the tab
+disappears so randoms can't self-sign-up.
+
+There's one prerequisite: Supabase by default requires email confirmation,
+and the default SMTP only allows ~3 emails/hour. Two ways through it:
+
+- **Disable confirmation** (fastest): Supabase Dashboard →
+  Authentication → **Sign In / Up** providers → Email → toggle
+  "Confirm email" **off**. Save. Now sign up works without an email.
+- **Or wire SMTP**: Authentication → Emails → SMTP Settings → enter
+  Resend's SMTP creds (host `smtp.resend.com`, port `465`, your Resend
+  username + API key as password). Then confirmation emails arrive.
+
+After signup, the trigger automatically:
+
+- Marks you as `is_platform_admin = true`
+- Grants you `owner` on every site
+
+You'll land on the workspaces page with all four sites and a
+**Platform admin** button top-right that takes you to `/admin`.
+
+### Verify in SQL
+
+```sql
+select email, is_platform_admin from public.profiles;
+```
+
+> **CRITICAL:** Become the first user BEFORE sharing the Vercel URL.
+> Otherwise whoever signs up first becomes super-admin.
 
 ---
 
@@ -347,8 +380,10 @@ If left blank, the platform default (`RESEND_*` env in step 5) is used.
 | Symptom | Fix |
 |---|---|
 | `supabase: command not found` | Install the CLI (step 8A) or use the dashboard (step 8B). |
-| Signup says "Email rate limit exceeded" | Supabase free-tier limit. Wait an hour or upgrade. |
-| First user isn't super-admin | Migration `0003` didn't run. Re-paste `MIGRATE_ALL.sql`. |
+| Signup says "Email rate limit exceeded" | Supabase free-tier SMTP cap. Use Option A in step 6 (add user via dashboard), or wire Resend SMTP. |
+| "Invalid login credentials" | The account doesn't exist yet. Use step 6 Option A to add yourself via the Supabase dashboard. |
+| "Create account" tab missing on /login | It only shows when zero users exist. Once anyone signs up, it disappears. To force-show it, delete all rows in `auth.users` (and `public.profiles`). |
+| First user isn't super-admin | Migration `0003` didn't run. Re-paste `MIGRATE_ALL.sql`. Verify with: `select is_platform_admin from profiles where email = 'you@x.com';` |
 | Site rebuilds aren't triggered | Check Build webhook URL in Settings; verify Amplify webhook is active. |
 | Form submissions return 401 | Check Studio → API Keys exists for that site, and `CMS_API_KEY` env on the public site matches. |
 | Form submissions don't email anyone | `RESEND_API_KEY` not set in Edge Functions secrets, OR site has no `notify_emails` configured. |
