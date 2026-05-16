@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { use, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
@@ -65,8 +67,6 @@ export function LoginForm({
       toast.error(error.message);
       return;
     }
-    // If email confirmations are off (the default for new projects in many
-    // regions), Supabase returns a session right away — just route forward.
     if (data.session) {
       toast.success("Account created");
       router.replace(params.next ?? "/");
@@ -95,44 +95,46 @@ export function LoginForm({
       return;
     }
     setMagicSent(true);
-    toast.success("Magic link sent — check your inbox");
+    toast.success("Magic link sent, check your inbox");
   }
 
   const isSignup = mode === "signup";
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold tracking-tight">
-          {isSignup ? "Create your account" : "Sign in"}
-        </h1>
+    <div className="space-y-6">
+      <div>
         {allowSignup && (
-          <div className="inline-flex rounded-md border border-[var(--color-border)] p-0.5 text-xs">
+          <div className="mb-5 inline-flex rounded-md border border-[var(--color-border)] p-0.5 text-xs">
             <button
               type="button"
               onClick={() => setMode("signin")}
-              className={`rounded px-2 py-1 transition ${mode === "signin" ? "bg-[var(--color-surface-2)] font-semibold" : "text-[var(--color-fg-muted)]"}`}
+              className={`rounded px-2.5 py-1 transition ${mode === "signin" ? "bg-[var(--color-surface-2)] font-semibold text-[var(--color-fg)]" : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"}`}
             >
               Sign in
             </button>
             <button
               type="button"
               onClick={() => setMode("signup")}
-              className={`rounded px-2 py-1 transition ${mode === "signup" ? "bg-[var(--color-surface-2)] font-semibold" : "text-[var(--color-fg-muted)]"}`}
+              className={`rounded px-2.5 py-1 transition ${mode === "signup" ? "bg-[var(--color-surface-2)] font-semibold text-[var(--color-fg)]" : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"}`}
             >
               Create account
             </button>
           </div>
         )}
+        <h1
+          className="text-[26px] leading-tight tracking-tight text-[var(--color-fg)]"
+          style={{ fontFamily: "var(--font-serif), serif" }}
+        >
+          {isSignup ? "Create your account" : "Welcome back"}
+        </h1>
+        <p className="mt-1.5 text-[13.5px] text-[var(--color-fg-muted)]">
+          {isSignup
+            ? "Use the email you'll log in with later."
+            : allowSignup
+              ? "Already have an account? Sign in here."
+              : "Use the email your admin invited."}
+        </p>
       </div>
-
-      <p className="text-sm text-[var(--color-fg-muted)]">
-        {isSignup
-          ? "Use the same email you'll log in with later."
-          : allowSignup
-            ? "Already have an account? Sign in here."
-            : "Use the email your admin invited."}
-      </p>
 
       <form
         className="space-y-4"
@@ -142,76 +144,58 @@ export function LoginForm({
         noValidate
       >
         {isSignup && (
-          <div className="space-y-1.5">
-            <label htmlFor="full_name" className="text-sm font-medium">Your name</label>
-            <input
-              id="full_name"
-              name="full_name"
-              type="text"
-              autoComplete="name"
-              className="w-full rounded-lg border border-[var(--color-border-strong)] bg-white px-3 py-2 text-sm shadow-xs"
-              placeholder="Ada Lovelace"
-            />
-          </div>
+          <Field label="Your name" htmlFor="full_name">
+            <Input id="full_name" name="full_name" type="text" autoComplete="name" placeholder="Ada Lovelace" />
+          </Field>
         )}
 
-        <div className="space-y-1.5">
-          <label htmlFor="email" className="text-sm font-medium">Email</label>
-          <input
-            id="email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            className="w-full rounded-lg border border-[var(--color-border-strong)] bg-white px-3 py-2 text-sm shadow-xs"
-            placeholder="you@company.com"
-          />
-        </div>
+        <Field label="Email" htmlFor="email">
+          <Input id="email" name="email" type="email" autoComplete="email" required placeholder="you@company.com" />
+        </Field>
 
-        <div className="space-y-1.5">
-          <label htmlFor="password" className="text-sm font-medium">
-            Password
-            {isSignup && (
-              <span className="ml-1 text-[var(--color-fg-subtle)] font-normal">· 8+ characters</span>
-            )}
-          </label>
-          <input
+        <Field
+          label="Password"
+          htmlFor="password"
+          hint={isSignup ? "8+ characters" : undefined}
+        >
+          <Input
             id="password"
             name="password"
             type="password"
             autoComplete={isSignup ? "new-password" : "current-password"}
             minLength={isSignup ? 8 : undefined}
             required
-            className="w-full rounded-lg border border-[var(--color-border-strong)] bg-white px-3 py-2 text-sm shadow-xs"
           />
-        </div>
+        </Field>
 
         {params.error && (
-          <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{params.error}</p>
+          <p className="rounded-md bg-[var(--tone-bad-bg)] px-3 py-2 text-[13px] text-[var(--tone-bad-fg)]">
+            {params.error}
+          </p>
         )}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="inline-flex w-full items-center justify-center rounded-lg bg-[var(--color-brand)] px-3 py-2 text-sm font-medium text-[var(--color-brand-fg)] shadow-xs transition disabled:opacity-60"
-        >
+        <Button type="submit" size="lg" disabled={pending} className="w-full">
           {pending ? (isSignup ? "Creating account…" : "Signing in…") : isSignup ? "Create account" : "Sign in"}
-        </button>
+        </Button>
 
-        <div className="relative my-2 flex items-center">
+        <div className="relative my-1 flex items-center">
           <span className="h-px flex-1 bg-[var(--color-border)]" />
-          <span className="px-3 text-xs uppercase tracking-wide text-[var(--color-fg-subtle)]">or</span>
+          <span className="px-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-fg-subtle)]">
+            or
+          </span>
           <span className="h-px flex-1 bg-[var(--color-border)]" />
         </div>
 
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="lg"
           formAction={(fd) => start(() => magicLink(fd))}
           disabled={pending || magicSent}
-          className="inline-flex w-full items-center justify-center rounded-lg border border-[var(--color-border-strong)] bg-white px-3 py-2 text-sm font-medium shadow-xs transition disabled:opacity-60"
+          className="w-full"
         >
-          {magicSent ? "Magic link sent ✓" : "Email me a magic link"}
-        </button>
+          {magicSent ? "Magic link sent" : "Email me a magic link"}
+        </Button>
       </form>
     </div>
   );

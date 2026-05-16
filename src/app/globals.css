@@ -1,46 +1,113 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ============================================================================
+ * Studio CMS · design tokens
+ * ----------------------------------------------------------------------------
+ * Color: OKLCH so light/dark sit on the same perceptual ramp. Neutrals are
+ * tinted toward a quiet warm hue (roughly h≈80) so the surface reads as
+ * paper, not screen. Brand indigo carries action only — never decoration.
+ *
+ * Typography: three families, each with a job.
+ *   --font-sans  → UI, set by next/font (Inter)
+ *   --font-serif → editorial titles + reading prose, set by next/font (Source Serif 4)
+ *   --font-mono  → slugs, IDs, code, env vars, set by next/font (JetBrains Mono)
+ *
+ * Spacing rhythm: 4 / 6 / 8 / 12 / 16 / 24 / 32 / 48 / 64 / 96 px.
+ * Avoid the "12px everywhere" trap — vary deliberately for hierarchy.
+ * ========================================================================== */
+
 @theme {
-  --color-bg: #fafaf9;
-  --color-surface: #ffffff;
-  --color-surface-2: #f5f5f4;
-  --color-border: #e7e5e4;
-  --color-border-strong: #d6d3d1;
-  --color-fg: #0c0a09;
-  --color-fg-muted: #57534e;
-  --color-fg-subtle: #78716c;
-  --color-brand: #4f46e5;
-  --color-brand-fg: #ffffff;
-  --color-success: #16a34a;
-  --color-warning: #d97706;
-  --color-danger: #dc2626;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Surface ramp (light) — warm paper, never #fff */
+  --color-bg:           oklch(0.985 0.005 80);
+  --color-surface:      oklch(1.000 0 0 / 0.96);
+  --color-surface-2:    oklch(0.965 0.006 80);
+  --color-surface-3:    oklch(0.945 0.007 80);
+
+  /* Borders — barely-there to architectural */
+  --color-border:        oklch(0.92 0.005 80);
+  --color-border-strong: oklch(0.85 0.008 80);
+
+  /* Foreground ramp — deep ink, never #000 */
+  --color-fg:        oklch(0.22 0.01 270);
+  --color-fg-muted:  oklch(0.45 0.01 270);
+  --color-fg-subtle: oklch(0.62 0.008 270);
+
+  /* Brand. Per-workspace overrides this var at the layout level. */
+  --color-brand:    oklch(0.55 0.20 275);
+  --color-brand-fg: oklch(0.985 0.01 275);
+  --color-brand-50: oklch(0.97 0.025 275);
+
+  /* Semantic */
+  --color-success: oklch(0.62 0.16 150);
+  --color-warning: oklch(0.72 0.16 80);
+  --color-danger:  oklch(0.58 0.21 25);
+  --color-info:    oklch(0.62 0.14 240);
+
+  /* Tones for pills (light + on-color foregrounds) */
+  --tone-draft-bg: oklch(0.94 0.005 80);
+  --tone-draft-fg: oklch(0.40 0.01 270);
+  --tone-pub-bg:   oklch(0.95 0.06 150);
+  --tone-pub-fg:   oklch(0.32 0.10 150);
+  --tone-warn-bg:  oklch(0.96 0.07 80);
+  --tone-warn-fg:  oklch(0.42 0.10 70);
+  --tone-info-bg:  oklch(0.95 0.05 240);
+  --tone-info-fg:  oklch(0.34 0.10 240);
+  --tone-bad-bg:   oklch(0.95 0.06 25);
+  --tone-bad-fg:   oklch(0.42 0.14 25);
+
+  /* Type scale (1.20 ratio, deliberate jumps) */
+  --text-2xs: 0.6875rem;   /* 11 */
+  --text-xs:  0.75rem;     /* 12 */
+  --text-sm:  0.875rem;    /* 14 */
+  --text-base:1rem;        /* 16 */
+  --text-lg:  1.125rem;    /* 18 */
+  --text-xl:  1.375rem;    /* 22 */
+  --text-2xl: 1.75rem;     /* 28 */
+  --text-3xl: 2.125rem;    /* 34 */
+  --text-4xl: 2.75rem;     /* 44 */
+  --text-display: 3.5rem;  /* 56 */
 }
 
 html[data-theme="dark"] {
-  --color-bg: #0c0a09;
-  --color-surface: #18181b;
-  --color-surface-2: #27272a;
-  --color-border: #2a2a2e;
-  --color-border-strong: #3f3f46;
-  --color-fg: #fafaf9;
-  --color-fg-muted: #a1a1aa;
-  --color-fg-subtle: #71717a;
-  --color-brand-fg: #ffffff;
+  --color-bg:           oklch(0.18 0.01 270);
+  --color-surface:      oklch(0.22 0.012 270);
+  --color-surface-2:    oklch(0.26 0.014 270);
+  --color-surface-3:    oklch(0.30 0.014 270);
+  --color-border:       oklch(0.30 0.013 270);
+  --color-border-strong:oklch(0.40 0.014 270);
+  --color-fg:           oklch(0.96 0.005 80);
+  --color-fg-muted:     oklch(0.78 0.008 80);
+  --color-fg-subtle:    oklch(0.62 0.008 80);
+  --color-brand-fg:     oklch(0.985 0.01 275);
+  --color-brand-50:     oklch(0.30 0.04 275);
+
+  --tone-draft-bg: oklch(0.30 0.013 270);
+  --tone-draft-fg: oklch(0.85 0.005 80);
+  --tone-pub-bg:   oklch(0.32 0.06 150);
+  --tone-pub-fg:   oklch(0.92 0.10 150);
+  --tone-warn-bg:  oklch(0.32 0.07 80);
+  --tone-warn-fg:  oklch(0.92 0.10 80);
+  --tone-info-bg:  oklch(0.30 0.06 240);
+  --tone-info-fg:  oklch(0.92 0.08 240);
+  --tone-bad-bg:   oklch(0.30 0.08 25);
+  --tone-bad-fg:   oklch(0.92 0.10 25);
   color-scheme: dark;
 }
 
 html, body {
   background: var(--color-bg);
   color: var(--color-fg);
-  font-family: var(--font-sans);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "ss01", "cv11", "calt", "kern";
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-body {
-  min-height: 100vh;
-}
+body { min-height: 100vh; }
+
+/* Numerals: tabular by default in tables and stats */
+.tabular { font-variant-numeric: tabular-nums; }
 
 /* Subtle scrollbar */
 * {
@@ -48,10 +115,81 @@ body {
   scrollbar-color: var(--color-border-strong) transparent;
 }
 
-/* TipTap editor */
-.ProseMirror {
-  min-height: 280px;
+/* ----------------------------------------------------------------------------
+ * Form focus — ring not outline so it sits on top of nearby borders
+ * -------------------------------------------------------------------------- */
+:where(input, textarea, select, button):focus-visible {
   outline: none;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-brand) 30%, transparent);
+  border-color: var(--color-brand);
+}
+
+/* ----------------------------------------------------------------------------
+ * The editor canvas (TipTap). Medium / Substack-feel: serif, generous,
+ * comfortable line length, no chrome competing for attention.
+ * -------------------------------------------------------------------------- */
+.editor-canvas {
+  max-width: 70ch;
+  margin-inline: auto;
+}
+
+.ProseMirror {
+  min-height: 60vh;
+  outline: none;
+  font-family: var(--font-serif), ui-serif, "Iowan Old Style", "Charter", Georgia, serif;
+  font-size: 1.1875rem;          /* 19px */
+  line-height: 1.7;
+  color: var(--color-fg);
+  letter-spacing: -0.005em;
+}
+.ProseMirror p { margin: 1.1em 0; }
+.ProseMirror p:first-child { margin-top: 0; }
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+  font-family: var(--font-serif), serif;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--color-fg);
+  font-weight: 600;
+}
+.ProseMirror h1 { font-size: 2rem; margin: 1.6em 0 0.6em; }
+.ProseMirror h2 { font-size: 1.6rem; margin: 1.5em 0 0.5em; }
+.ProseMirror h3 { font-size: 1.25rem; margin: 1.3em 0 0.4em; }
+.ProseMirror a {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+.ProseMirror blockquote {
+  border-left: 2px solid var(--color-border-strong);
+  padding-left: 1.25rem;
+  color: var(--color-fg-muted);
+  font-style: italic;
+}
+.ProseMirror ul, .ProseMirror ol { padding-left: 1.5rem; }
+.ProseMirror ul li { list-style: disc; }
+.ProseMirror ol li { list-style: decimal; }
+.ProseMirror img {
+  border-radius: 6px;
+  margin: 1.5rem 0;
+  max-width: 100%;
+}
+.ProseMirror code {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  background: var(--color-surface-2);
+  padding: 0.12em 0.36em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.ProseMirror pre {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  background: var(--color-fg);
+  color: var(--color-bg);
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.6;
 }
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -59,10 +197,80 @@ body {
   color: var(--color-fg-subtle);
   pointer-events: none;
   height: 0;
+  font-style: italic;
 }
 
-/* Form focus */
-:where(input, textarea, select):focus-visible {
-  outline: 2px solid var(--color-brand);
-  outline-offset: 1px;
+/* The headline input above the editor */
+.editor-title {
+  font-family: var(--font-serif), serif;
+  font-size: clamp(1.875rem, 4vw, 2.5rem);
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+  color: var(--color-fg);
+  width: 100%;
+  background: transparent;
+  border: 0;
+  outline: none;
+  resize: none;
+  padding: 0;
+}
+.editor-title::placeholder { color: var(--color-fg-subtle); font-style: italic; font-weight: 400; }
+
+/* Minimal floating toolbar for the editor */
+.editor-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: 0 1px 0 oklch(0.18 0.01 270 / 0.04);
+}
+.editor-toolbar button {
+  display: grid;
+  place-items: center;
+  height: 28px;
+  width: 28px;
+  border-radius: 6px;
+  color: var(--color-fg-muted);
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+.editor-toolbar button:hover { background: var(--color-surface-2); color: var(--color-fg); }
+.editor-toolbar button[aria-pressed="true"] {
+  background: var(--color-fg);
+  color: var(--color-bg);
+}
+.editor-toolbar .sep {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border);
+  margin: 0 2px;
+}
+
+/* Marketing prose (rendered article preview) */
+.prose-studio {
+  font-family: var(--font-serif), serif;
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: var(--color-fg);
+  max-width: 70ch;
+}
+
+/* Keyboard hint chip */
+kbd, .kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 0.35em;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  font-family: var(--font-mono), monospace;
+  font-size: 0.75em;
+  color: var(--color-fg-muted);
 }

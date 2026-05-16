@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Image as ImageIcon, Trash2 } from "lucide-react";
+import { Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
+import { Section } from "@/components/ui/surface";
 import { uploadMedia } from "@/lib/media-upload";
 import { slugify } from "@/lib/utils";
 import type { CaseStudy, ContentStatus } from "@/lib/supabase/types";
@@ -69,119 +70,164 @@ export function CaseForm({ siteSlug: _siteSlug, siteId, initial, onSubmit, onDel
   }
 
   return (
-    <form action={submit} className="grid gap-6 lg:grid-cols-[1fr_320px]">
-      <div className="space-y-5">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-          <Field label="Title" required>
-            <Input value={title} onChange={(e) => titleChanged(e.target.value)} />
-          </Field>
-          <Field label="Slug">
-            <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Client">
-              <Input value={client ?? ""} onChange={(e) => setClient(e.target.value)} />
-            </Field>
-            <Field label="Industry">
-              <Input value={industry ?? ""} onChange={(e) => setIndustry(e.target.value)} />
-            </Field>
-            <Field label="Category">
-              <Input value={category ?? ""} onChange={(e) => setCategory(e.target.value)} />
-            </Field>
-            <Field label="Stack" hint="Comma separated">
-              <Input value={stack} onChange={(e) => setStack(e.target.value)} />
-            </Field>
-          </div>
-          <Field label="Snippet">
-            <Textarea value={snippet ?? ""} onChange={(e) => setSnippet(e.target.value)} rows={3} />
-          </Field>
+    <form action={submit} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="min-w-0 space-y-8">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6 space-y-6">
+          <Section title="Identity">
+            <div className="space-y-4">
+              <Field label="Title" required>
+                <Input value={title} onChange={(e) => titleChanged(e.target.value)} />
+              </Field>
+              <Field label="Slug">
+                <Input
+                  value={slug}
+                  onChange={(e) => setSlug(slugify(e.target.value))}
+                  className="font-mono text-[12px]"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Client">
+                  <Input value={client ?? ""} onChange={(e) => setClient(e.target.value)} />
+                </Field>
+                <Field label="Industry">
+                  <Input value={industry ?? ""} onChange={(e) => setIndustry(e.target.value)} />
+                </Field>
+                <Field label="Category">
+                  <Input value={category ?? ""} onChange={(e) => setCategory(e.target.value)} />
+                </Field>
+                <Field label="Stack" hint="Comma separated">
+                  <Input value={stack} onChange={(e) => setStack(e.target.value)} />
+                </Field>
+              </div>
+              <Field label="Snippet" hint="One paragraph shown on cards & previews.">
+                <Textarea value={snippet ?? ""} onChange={(e) => setSnippet(e.target.value)} rows={3} />
+              </Field>
+            </div>
+          </Section>
         </div>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-          <div className="text-sm font-semibold">Story</div>
-          <Field label="Challenge">
-            <Textarea value={challenge ?? ""} onChange={(e) => setChallenge(e.target.value)} rows={4} />
-          </Field>
-          <Field label="Solution">
-            <Textarea value={solution ?? ""} onChange={(e) => setSolution(e.target.value)} rows={4} />
-          </Field>
-          <Field label="Outcomes" hint="One per line.">
-            <Textarea value={outcomes} onChange={(e) => setOutcomes(e.target.value)} rows={5} />
-          </Field>
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <Section title="Story">
+            <div className="space-y-4">
+              <Field label="Challenge">
+                <Textarea value={challenge ?? ""} onChange={(e) => setChallenge(e.target.value)} rows={4} />
+              </Field>
+              <Field label="Solution">
+                <Textarea value={solution ?? ""} onChange={(e) => setSolution(e.target.value)} rows={4} />
+              </Field>
+              <Field label="Outcomes" hint="One per line">
+                <Textarea value={outcomes} onChange={(e) => setOutcomes(e.target.value)} rows={5} />
+              </Field>
+            </div>
+          </Section>
         </div>
 
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-          <div className="text-sm font-semibold">Metrics & chart</div>
-          <Field label="Metrics" hint='JSON array, e.g. [{"label":"Editorial Placements","value":"6+"}]'>
-            <Textarea value={metricsJson} onChange={(e) => setMetricsJson(e.target.value)} rows={5} className="font-mono text-xs" />
-          </Field>
-          <Field label="Chart data" hint='JSON array, e.g. [{"stage":"Audit","score":45}]'>
-            <Textarea value={chartJson} onChange={(e) => setChartJson(e.target.value)} rows={5} className="font-mono text-xs" />
-          </Field>
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-6">
+          <Section title="Metrics & chart">
+            <div className="space-y-4">
+              <Field label="Metrics" hint='[{"label":"Placements","value":"6+"}]'>
+                <Textarea
+                  value={metricsJson}
+                  onChange={(e) => setMetricsJson(e.target.value)}
+                  rows={5}
+                  className="font-mono text-xs"
+                />
+              </Field>
+              <Field label="Chart data" hint='[{"stage":"Audit","score":45}]'>
+                <Textarea
+                  value={chartJson}
+                  onChange={(e) => setChartJson(e.target.value)}
+                  rows={5}
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </div>
+          </Section>
         </div>
       </div>
 
-      <aside className="space-y-5">
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-          <Field label="Status">
-            <Select value={status} onChange={(e) => setStatus(e.target.value as ContentStatus)}>
-              <option value="draft">Draft</option>
-              <option value="scheduled">Scheduled</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
-            </Select>
-          </Field>
-          <Button type="submit" disabled={pending} className="w-full">
-            {pending ? "Saving…" : status === "published" ? "Publish" : "Save"}
-          </Button>
-          {onDelete && (
-            <button
-              type="button"
-              onClick={() => {
-                if (!confirm("Delete this case study?")) return;
-                start(async () => {
-                  try {
-                    await onDelete();
-                    toast.success("Deleted");
-                  } catch (e) {
-                    toast.error(e instanceof Error ? e.message : "Delete failed");
-                  }
-                });
-              }}
-              className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-[var(--color-border-strong)] px-3 py-1.5 text-sm text-[var(--color-danger)] transition hover:bg-red-50"
-            >
-              <Trash2 className="h-4 w-4" /> Delete
-            </button>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3">
-          <div className="text-sm font-semibold">Hero image</div>
-          {imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={imageUrl} alt="" className="aspect-[16/10] w-full rounded-md object-cover" />
-          ) : (
-            <div className="grid aspect-[16/10] place-items-center rounded-md border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-2)] text-[var(--color-fg-subtle)]">
-              <ImageIcon className="h-6 w-6" />
+      <aside className="lg:sticky lg:top-20 lg:self-start">
+        <div className="space-y-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+          <Section title="Publish">
+            <div className="space-y-3">
+              <Field label="Status">
+                <Select value={status} onChange={(e) => setStatus(e.target.value as ContentStatus)}>
+                  <option value="draft">Draft</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </Select>
+              </Field>
+              <Button type="submit" size="lg" disabled={pending} className="w-full">
+                {pending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Saving…
+                  </>
+                ) : status === "published" ? "Publish" : "Save draft"}
+              </Button>
+              {onDelete && initial?.id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!confirm("Delete this case study?")) return;
+                    start(async () => {
+                      try {
+                        await onDelete();
+                        toast.success("Deleted");
+                      } catch (e) {
+                        toast.error(e instanceof Error ? e.message : "Delete failed");
+                      }
+                    });
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] text-[var(--color-fg-subtle)] transition hover:text-[var(--color-danger)]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Delete case study
+                </button>
+              )}
             </div>
-          )}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              setUploading(true);
-              const url = await uploadMedia({ file: f, siteId });
-              setUploading(false);
-              if (url) setImageUrl(url);
-            }}
-            className="block w-full text-xs"
-          />
-          {uploading && <div className="text-xs text-[var(--color-fg-subtle)]">Uploading…</div>}
-          <Field label="Image URL">
-            <Input value={imageUrl ?? ""} onChange={(e) => setImageUrl(e.target.value)} />
-          </Field>
+          </Section>
+
+          <Section title="Hero image">
+            {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={imageUrl} alt="" className="aspect-[16/10] w-full rounded-md object-cover" />
+            ) : (
+              <label className="grid aspect-[16/10] cursor-pointer place-items-center rounded-md border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-2)] text-[var(--color-fg-subtle)] transition hover:bg-[var(--color-surface-3)]">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    setUploading(true);
+                    const url = await uploadMedia({ file: f, siteId });
+                    setUploading(false);
+                    if (url) setImageUrl(url);
+                  }}
+                />
+                <div className="text-center">
+                  {uploading ? (
+                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
+                  ) : (
+                    <>
+                      <Upload className="mx-auto h-5 w-5" />
+                      <div className="mt-2 text-[11.5px]">Click to upload</div>
+                    </>
+                  )}
+                </div>
+              </label>
+            )}
+            <div className="mt-3">
+              <Field label="Image URL">
+                <Input
+                  value={imageUrl ?? ""}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="font-mono text-[12px]"
+                />
+              </Field>
+            </div>
+          </Section>
         </div>
       </aside>
     </form>

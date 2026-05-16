@@ -1,9 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { getSiteSchema } from "@/lib/schemas";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/ui/page-header";
 import { BlogForm } from "../blog-form";
 import { deleteBlogPost, updateBlogPost } from "../actions";
 import type { BlogPost } from "@/lib/supabase/types";
@@ -37,22 +37,28 @@ export default async function EditBlogPostPage({
 
   return (
     <div>
-      <PageHeader
-        title={post.title || "(untitled)"}
-        description={`/${post.slug}`}
-        action={
-          previewUrl ? (
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-medium shadow-xs transition hover:bg-[var(--color-surface-2)]"
-            >
-              Preview <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          ) : null
-        }
-      />
+      {/* Minimal breadcrumb — the editor itself owns the page hierarchy.
+          No big PageHeader here, the editor's title input IS the headline. */}
+      <div className="mb-8 flex items-center justify-between">
+        <Link
+          href={`/${site.slug}/blog`}
+          className="inline-flex items-center gap-1.5 font-mono text-[11.5px] uppercase tracking-[0.12em] text-[var(--color-fg-subtle)] transition hover:text-[var(--color-fg)]"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Blog
+        </Link>
+        {previewUrl && (
+          <a
+            href={previewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-[12px] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+          >
+            Preview <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+      </div>
+
       <BlogForm
         siteSlug={siteSlug}
         siteId={site.id}

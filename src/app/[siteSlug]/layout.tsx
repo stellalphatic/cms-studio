@@ -37,7 +37,7 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="min-h-svh bg-[var(--color-bg)]" style={themeStyle}>
-      <div className="grid min-h-svh grid-cols-[260px_1fr]">
+      <div className="grid min-h-svh grid-cols-[240px_minmax(0,1fr)]">
         <Sidebar site={site} schema={schema} role={role} />
         <div className="flex min-w-0 flex-col">
           <Topbar
@@ -47,7 +47,9 @@ export default async function WorkspaceLayout({
             allMemberships={visibleMemberships}
             isWhitelabel={Boolean(whitelabel)}
           />
-          <main className="min-w-0 flex-1 px-8 py-8">{children}</main>
+          <main className="min-w-0 flex-1 px-10 py-10">
+            <div className="mx-auto w-full max-w-[1180px]">{children}</div>
+          </main>
         </div>
       </div>
     </div>

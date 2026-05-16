@@ -1,6 +1,7 @@
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { getSiteSchema } from "@/lib/schemas";
-import { PageHeader } from "@/components/ui/page-header";
 import { BlogForm } from "../blog-form";
 import { createBlogPost } from "../actions";
 
@@ -18,7 +19,16 @@ export default async function NewBlogPostPage({
 
   return (
     <div>
-      <PageHeader title="New post" description="Draft something exceptional." />
+      <div className="mb-8">
+        <Link
+          href={`/${site.slug}/blog`}
+          className="inline-flex items-center gap-1.5 font-mono text-[11.5px] uppercase tracking-[0.12em] text-[var(--color-fg-subtle)] transition hover:text-[var(--color-fg)]"
+        >
+          <ArrowLeft className="h-3 w-3" />
+          Blog
+        </Link>
+      </div>
+
       <BlogForm
         siteSlug={siteSlug}
         siteId={site.id}

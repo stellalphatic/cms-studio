@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { ContentStatusPill } from "@/components/ui/status-pill";
+import { DataTable, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Empty } from "@/components/ui/surface";
 import { formatRelative } from "@/lib/utils";
 import type { CaseStudy } from "@/lib/supabase/types";
 
@@ -44,42 +46,58 @@ export default async function CaseStudiesPage({
         }
       />
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-        {cases.length > 0 ? (
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--color-surface-2)] text-left text-xs uppercase tracking-wider text-[var(--color-fg-subtle)]">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Title</th>
-                <th className="px-4 py-2.5 font-medium">Client</th>
-                <th className="px-4 py-2.5 font-medium">Industry</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Updated</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border)]">
-              {cases.map((c) => (
-                <tr key={c.id} className="hover:bg-[var(--color-surface-2)]">
-                  <td className="px-4 py-3">
-                    <Link href={`/${site.slug}/case-studies/${c.id}`} className="font-medium hover:underline">
-                      {c.title || <span className="italic text-[var(--color-fg-subtle)]">(untitled)</span>}
-                    </Link>
-                    <div className="mt-0.5 font-mono text-[11px] text-[var(--color-fg-subtle)]">/{c.slug}</div>
-                  </td>
-                  <td className="px-4 py-3 text-[var(--color-fg-muted)]">{c.client ?? "—"}</td>
-                  <td className="px-4 py-3 text-[var(--color-fg-muted)]">{c.industry ?? "—"}</td>
-                  <td className="px-4 py-3"><ContentStatusPill status={c.status} /></td>
-                  <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatRelative(c.updated_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="px-6 py-16 text-center">
-            <p className="text-sm font-medium">No case studies yet</p>
-            <p className="mt-1 text-sm text-[var(--color-fg-muted)]">Showcase your wins.</p>
-          </div>
-        )}
-      </div>
+      {cases.length > 0 ? (
+        <DataTable>
+          <THead>
+            <TR>
+              <TH>Title</TH>
+              <TH>Client</TH>
+              <TH>Industry</TH>
+              <TH>Status</TH>
+              <TH align="right">Updated</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {cases.map((c) => (
+              <TR key={c.id}>
+                <TD>
+                  <Link
+                    href={`/${site.slug}/case-studies/${c.id}`}
+                    className="block text-[14px] font-medium hover:underline underline-offset-4"
+                    style={{ fontFamily: "var(--font-serif), serif" }}
+                  >
+                    {c.title || <span className="italic text-[var(--color-fg-subtle)]">(untitled)</span>}
+                  </Link>
+                  <div className="mt-0.5 font-mono text-[11px] text-[var(--color-fg-subtle)]">/{c.slug}</div>
+                </TD>
+                <TD muted>{c.client ?? "—"}</TD>
+                <TD muted>{c.industry ?? "—"}</TD>
+                <TD>
+                  <ContentStatusPill status={c.status} />
+                </TD>
+                <TD muted align="right" mono>
+                  {formatRelative(c.updated_at)}
+                </TD>
+              </TR>
+            ))}
+          </TBody>
+        </DataTable>
+      ) : (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <Empty
+            icon={FileText}
+            title="No case studies yet"
+            hint="Showcase a win that turned into a result. Numbers, quotes, before-and-after."
+            action={
+              <Link href={`/${site.slug}/case-studies/new`}>
+                <Button>
+                  <Plus className="h-4 w-4" /> First case study
+                </Button>
+              </Link>
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

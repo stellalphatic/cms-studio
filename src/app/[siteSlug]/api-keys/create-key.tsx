@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import { Copy, Check } from "lucide-react";
+import { Check, Copy, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { createApiKey } from "./actions";
@@ -32,37 +32,47 @@ export function CreateApiKey({ siteSlug }: { siteSlug: string }) {
 
   if (plaintext) {
     return (
-      <div className="rounded-2xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/30 p-5 space-y-3">
-        <div className="text-sm font-semibold text-amber-900 dark:text-amber-200">
-          Copy this key now — it will never be shown again.
+      <div className="rounded-xl border border-[oklch(0.85_0.12_80)] bg-[var(--tone-warn-bg)] p-5">
+        <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--tone-warn-fg)]">
+          New key · shown once
         </div>
-        <div className="flex items-center gap-2">
-          <code className="flex-1 rounded-lg border border-amber-300 bg-white dark:bg-zinc-950 px-3 py-2 font-mono text-xs break-all">
+        <p className="mt-1 text-[13px] text-[var(--tone-warn-fg)]">
+          Copy this key now. You will not see it again, only its prefix.
+        </p>
+        <div className="mt-4 flex items-center gap-2">
+          <code className="flex-1 break-all rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-2.5 font-mono text-[12px] text-[var(--color-fg)]">
             {plaintext}
           </code>
           <Button type="button" variant="secondary" onClick={copy}>
-            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            <span className="ml-1">{copied ? "Copied" : "Copy"}</span>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? "Copied" : "Copy"}
           </Button>
         </div>
-        <Button type="button" variant="ghost" onClick={() => setPlaintext(null)}>
-          Done
-        </Button>
+        <button
+          type="button"
+          onClick={() => setPlaintext(null)}
+          className="mt-4 text-[12px] text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]"
+        >
+          Done, I&apos;ve saved it.
+        </button>
       </div>
     );
   }
 
   return (
-    <form action={submit} className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-3">
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr_auto] sm:items-end">
+    <form
+      action={submit}
+      className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5"
+    >
+      <div className="grid items-end gap-3 sm:grid-cols-[2fr_140px_auto]">
         <Field label="Key name" required>
           <Input name="name" placeholder="kingsbridge production build" required />
         </Field>
-        <Field label="Expires in (days)" hint="0 = no expiry">
+        <Field label="Expires (days)" hint="0 = never">
           <Input name="expires_in_days" type="number" defaultValue={0} min={0} />
         </Field>
         <Button type="submit" disabled={pending}>
-          {pending ? "Creating…" : "Create key"}
+          <Plus className="h-4 w-4" /> {pending ? "Creating…" : "Create key"}
         </Button>
       </div>
     </form>

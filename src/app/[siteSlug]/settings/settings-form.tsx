@@ -1,6 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
@@ -22,47 +23,56 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
   }
 
   return (
-    <form action={submit} className="space-y-5">
-      <Section title="Identity">
+    <form action={submit} className="space-y-10">
+      <SettingSection
+        title="Identity"
+        description="The basics. Slug is fixed once set so existing links keep working."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Workspace name" required>
             <Input name="name" defaultValue={site.name} disabled={!canEdit} />
           </Field>
-          <Field label="Slug" hint="URL identifier, not editable">
-            <Input value={site.slug} disabled />
+          <Field label="Slug" hint="Used in URLs">
+            <Input value={site.slug} disabled className="font-mono text-[12px]" />
           </Field>
         </div>
         <Field
           label="Primary domain"
-          hint="The public site, e.g. searchhub.digital. Used for preview links."
+          hint="The public site, e.g. searchhub.digital"
         >
           <Input
             name="primary_domain"
             defaultValue={site.primary_domain ?? ""}
             disabled={!canEdit}
             placeholder="example.com"
+            className="font-mono text-[12px]"
           />
         </Field>
         <Field
           label="Custom CMS subdomain"
-          hint="Optional. If you CNAME e.g. cms.yourdomain.com to this Studio deployment, visitors land directly in this workspace."
+          hint="CNAME e.g. cms.yourdomain.com to land directly in this workspace."
         >
           <Input
             name="cms_domain"
             defaultValue={site.cms_domain ?? ""}
             disabled={!canEdit}
             placeholder="cms.example.com"
+            className="font-mono text-[12px]"
           />
         </Field>
-      </Section>
+      </SettingSection>
 
-      <Section title="Branding">
+      <SettingSection
+        title="Branding"
+        description="Colors used in this workspace and on the public preview. Tagline appears on the dashboard."
+      >
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Primary color" hint="Used for buttons and accents">
+          <Field label="Primary color" hint="Buttons & accents">
             <Input
               name="brand_primary"
               defaultValue={site.brand?.primary ?? "#4f46e5"}
               disabled={!canEdit}
+              className="font-mono text-[12px]"
             />
           </Field>
           <Field label="Accent color">
@@ -70,6 +80,7 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
               name="brand_accent"
               defaultValue={site.brand?.accent ?? ""}
               disabled={!canEdit}
+              className="font-mono text-[12px]"
             />
           </Field>
         </div>
@@ -78,13 +89,14 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             name="brand_tagline"
             defaultValue={site.brand?.tagline ?? ""}
             disabled={!canEdit}
+            placeholder="A one-line description of this workspace"
           />
         </Field>
-      </Section>
+      </SettingSection>
 
-      <Section
+      <SettingSection
         title="Build webhook"
-        description="Hit when published content changes (debounced 30s). Find this in AWS Amplify Console → App → App settings → Build settings → Incoming webhooks."
+        description="POSTed when published content changes (debounced ~30s). Find this in AWS Amplify → App settings → Build settings → Incoming webhooks."
       >
         <Field label="Amplify webhook URL">
           <Input
@@ -93,17 +105,18 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             disabled={!canEdit}
             placeholder="https://webhooks.amplify.us-east-1.amazonaws.com/prod/webhooks?id=..."
             type="url"
+            className="font-mono text-[12px]"
           />
         </Field>
-      </Section>
+      </SettingSection>
 
-      <Section
+      <SettingSection
         title="Form notifications"
         description="Each site uses its own Resend account so the right person gets contact-form emails. Leave blank to use the platform default."
       >
         <Field
           label="Resend API key"
-          hint="Get yours at resend.com → API Keys. Stored encrypted at rest."
+          hint="resend.com → API Keys"
         >
           <Input
             name="resend_api_key"
@@ -111,11 +124,12 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             disabled={!canEdit}
             placeholder="re_..."
             type="password"
+            className="font-mono text-[12px]"
           />
         </Field>
         <Field
           label="From address"
-          hint='Must be a verified sender on this Resend account, e.g. "Studio Notifications &lt;notify@yourdomain.com&gt;"'
+          hint="Must be a verified Resend sender"
         >
           <Input
             name="resend_from_email"
@@ -124,7 +138,7 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             placeholder="Notifications <hello@example.com>"
           />
         </Field>
-        <Field label="Notify emails" hint="Comma-separated recipients.">
+        <Field label="Notify emails" hint="Comma separated">
           <Input
             name="notify_emails"
             defaultValue={(site.notify_emails ?? []).join(", ")}
@@ -132,35 +146,44 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             placeholder="owner@example.com, sales@example.com"
           />
         </Field>
-      </Section>
+      </SettingSection>
 
-      <Section
-        title="CORS / public API"
-        description="Origins allowed to POST to the public form endpoint and read the public API. Defaults to the platform allow-list."
+      <SettingSection
+        title="CORS · public API"
+        description="Origins allowed to POST to the form endpoint and read the public API. Defaults to the platform allow-list."
       >
-        <Field label="Allowed origins" hint="Comma-separated.">
+        <Field label="Allowed origins" hint="Comma separated">
           <Textarea
             name="allowed_origins"
             rows={2}
             defaultValue={(site.allowed_origins ?? []).join(", ")}
             disabled={!canEdit}
             placeholder="https://example.com, https://www.example.com"
+            className="font-mono text-[12px]"
           />
         </Field>
-      </Section>
+      </SettingSection>
 
       {canEdit && (
-        <div className="flex justify-end">
-          <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save settings"}
-          </Button>
+        <div className="sticky bottom-4 z-10 flex justify-end">
+          <div className="rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1 shadow-[0_4px_16px_-8px_oklch(0.18_0.01_270_/_0.25)]">
+            <Button type="submit" disabled={pending} className="rounded-full px-5">
+              {pending ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+                </>
+              ) : (
+                "Save settings"
+              )}
+            </Button>
+          </div>
         </div>
       )}
     </form>
   );
 }
 
-function Section({
+function SettingSection({
   title,
   description,
   children,
@@ -170,14 +193,21 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 space-y-4">
-      <div>
-        <div className="text-sm font-semibold">{title}</div>
+    <section className="grid gap-6 border-t border-[var(--color-border)] pt-8 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <div className="lg:pt-1">
+        <h2
+          className="text-[15px] font-semibold tracking-tight"
+          style={{ fontFamily: "var(--font-serif), serif" }}
+        >
+          {title}
+        </h2>
         {description && (
-          <p className="mt-1 text-xs text-[var(--color-fg-muted)]">{description}</p>
+          <p className="mt-1.5 max-w-[36ch] text-[12.5px] leading-relaxed text-[var(--color-fg-muted)]">
+            {description}
+          </p>
         )}
       </div>
-      {children}
+      <div className="space-y-4">{children}</div>
     </section>
   );
 }

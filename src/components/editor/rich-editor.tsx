@@ -31,9 +31,22 @@ interface Props {
   placeholder?: string;
   siteId: string;
   className?: string;
+  /**
+   * When true, render without an outer card / toolbar chrome — the editor
+   * blends into the surrounding page (Medium-style focused canvas).
+   * Toolbar still appears, but as a sticky bar at the top of the viewport.
+   */
+  bare?: boolean;
 }
 
-export function RichEditor({ value, onChange, placeholder, siteId, className }: Props) {
+export function RichEditor({
+  value,
+  onChange,
+  placeholder,
+  siteId,
+  className,
+  bare = false,
+}: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const editor = useEditor({
@@ -41,17 +54,16 @@ export function RichEditor({ value, onChange, placeholder, siteId, className }: 
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Link.configure({
         openOnClick: false,
-        HTMLAttributes: { class: "underline text-[var(--color-brand)]" },
+        HTMLAttributes: { class: "underline" },
       }),
       Image,
-      Placeholder.configure({ placeholder: placeholder ?? "Write something exceptional…" }),
+      Placeholder.configure({ placeholder: placeholder ?? "Start writing. The first sentence is the hardest." }),
     ],
     content: value,
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class:
-          "prose prose-stone max-w-none focus:outline-none min-h-[280px] px-4 py-3",
+        class: "focus:outline-none",
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -76,84 +88,117 @@ export function RichEditor({ value, onChange, placeholder, siteId, className }: 
 
   if (!editor) return null;
 
-  return (
-    <div className={cn("rounded-lg border border-[var(--color-border-strong)] bg-white shadow-xs", className)}>
-      <div className="flex flex-wrap items-center gap-1 border-b border-[var(--color-border)] px-2 py-1.5">
-        <Tool active={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold"><Bold className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic"><Italic className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough"><Strikethrough className="h-4 w-4" /></Tool>
-        <Sep />
-        <Tool active={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="H1"><Heading1 className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="H2"><Heading2 className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="H3"><Heading3 className="h-4 w-4" /></Tool>
-        <Sep />
-        <Tool active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list"><List className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list"><ListOrdered className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote"><QuoteIcon className="h-4 w-4" /></Tool>
-        <Tool active={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block"><Code className="h-4 w-4" /></Tool>
-        <Sep />
-        <Tool
-          onClick={() => {
-            const prev = editor.getAttributes("link").href as string | undefined;
-            const url = window.prompt("URL", prev ?? "https://");
-            if (url === null) return;
-            if (url === "") return editor.chain().focus().unsetLink().run();
-            editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
-          }}
-          title="Link"
-        >
-          <LinkIcon className="h-4 w-4" />
-        </Tool>
-        <Tool onClick={() => fileInputRef.current?.click()} title="Insert image">
-          <ImageIcon className="h-4 w-4" />
-        </Tool>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) void handleImageUpload(f);
-            e.target.value = "";
-          }}
-        />
-        <div className="ml-auto flex items-center gap-1">
-          <Tool onClick={() => editor.chain().focus().undo().run()} title="Undo"><Undo2 className="h-4 w-4" /></Tool>
-          <Tool onClick={() => editor.chain().focus().redo().run()} title="Redo"><Redo2 className="h-4 w-4" /></Tool>
+  const toolbar = (
+    <div className="editor-toolbar">
+      <Tool pressed={editor.isActive("bold")} onClick={() => editor.chain().focus().toggleBold().run()} title="Bold (⌘B)">
+        <Bold className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("italic")} onClick={() => editor.chain().focus().toggleItalic().run()} title="Italic (⌘I)">
+        <Italic className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("strike")} onClick={() => editor.chain().focus().toggleStrike().run()} title="Strikethrough">
+        <Strikethrough className="h-3.5 w-3.5" />
+      </Tool>
+      <span className="sep" />
+      <Tool pressed={editor.isActive("heading", { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} title="Heading 1">
+        <Heading1 className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("heading", { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} title="Heading 2">
+        <Heading2 className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("heading", { level: 3 })} onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} title="Heading 3">
+        <Heading3 className="h-3.5 w-3.5" />
+      </Tool>
+      <span className="sep" />
+      <Tool pressed={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()} title="Bullet list">
+        <List className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("orderedList")} onClick={() => editor.chain().focus().toggleOrderedList().run()} title="Numbered list">
+        <ListOrdered className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("blockquote")} onClick={() => editor.chain().focus().toggleBlockquote().run()} title="Quote">
+        <QuoteIcon className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool pressed={editor.isActive("codeBlock")} onClick={() => editor.chain().focus().toggleCodeBlock().run()} title="Code block">
+        <Code className="h-3.5 w-3.5" />
+      </Tool>
+      <span className="sep" />
+      <Tool
+        onClick={() => {
+          const prev = editor.getAttributes("link").href as string | undefined;
+          const url = window.prompt("URL", prev ?? "https://");
+          if (url === null) return;
+          if (url === "") {
+            editor.chain().focus().unsetLink().run();
+            return;
+          }
+          editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+        }}
+        title="Link (⌘K)"
+      >
+        <LinkIcon className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool onClick={() => fileInputRef.current?.click()} title="Insert image">
+        <ImageIcon className="h-3.5 w-3.5" />
+      </Tool>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void handleImageUpload(f);
+          e.target.value = "";
+        }}
+      />
+      <span className="sep" />
+      <Tool onClick={() => editor.chain().focus().undo().run()} title="Undo">
+        <Undo2 className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool onClick={() => editor.chain().focus().redo().run()} title="Redo">
+        <Redo2 className="h-3.5 w-3.5" />
+      </Tool>
+    </div>
+  );
+
+  if (bare) {
+    return (
+      <div className={cn("relative", className)}>
+        <div className="sticky top-14 z-10 -mx-2 flex justify-center pb-3 pt-2">
+          {toolbar}
         </div>
+        <EditorContent editor={editor} />
       </div>
-      <EditorContent editor={editor} />
+    );
+  }
+
+  return (
+    <div className={cn("rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]", className)}>
+      <div className="flex items-center justify-center border-b border-[var(--color-border)] px-3 py-2">
+        {toolbar}
+      </div>
+      <div className="px-5 py-4">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }
 
 function Tool({
   onClick,
-  active,
+  pressed,
   title,
   children,
 }: {
   onClick: () => void;
-  active?: boolean;
+  pressed?: boolean;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "grid h-8 w-8 place-items-center rounded text-[var(--color-fg-muted)] transition hover:bg-[var(--color-surface-2)] hover:text-[var(--color-fg)]",
-        active && "bg-[var(--color-surface-2)] text-[var(--color-fg)]",
-      )}
-    >
+    <button type="button" onClick={onClick} title={title} aria-pressed={pressed}>
       {children}
     </button>
   );
-}
-
-function Sep() {
-  return <span className="mx-1 h-5 w-px bg-[var(--color-border)]" />;
 }

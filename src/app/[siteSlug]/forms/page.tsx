@@ -2,21 +2,19 @@ import Link from "next/link";
 import { ArrowDownToLine, Inbox } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmissionStatusPill } from "@/components/ui/status-pill";
+import { DataTable, TBody, TD, TH, THead, TR } from "@/components/ui/table";
+import { Empty } from "@/components/ui/surface";
+import { cn } from "@/lib/utils";
 import { formatRelative } from "@/lib/utils";
 import type { FormSubmission, SubmissionStatus } from "@/lib/supabase/types";
 import { FilterBar } from "./filter-bar";
 
 export const metadata = { title: "Submissions" };
 
-const STATUS_COUNTS: SubmissionStatus[] = [
-  "new",
-  "in_progress",
-  "contacted",
-  "closed",
-  "spam",
-];
+const STATUS_COUNTS: SubmissionStatus[] = ["new", "in_progress", "contacted", "closed", "spam"];
 
 export default async function FormsPage({
   params,
@@ -53,7 +51,6 @@ export default async function FormsPage({
     );
   }
 
-  // Counts per status
   const counts: Record<string, number> = {};
   await Promise.all(
     STATUS_COUNTS.map(async (s) => {
@@ -74,76 +71,123 @@ export default async function FormsPage({
         action={
           <a
             href={`/${siteSlug}/forms/export?${new URLSearchParams(sp as Record<string, string>).toString()}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--color-border-strong)] bg-[var(--color-surface)] px-3 py-1.5 text-sm font-medium shadow-xs transition hover:bg-[var(--color-surface-2)]"
           >
-            <ArrowDownToLine className="h-4 w-4" /> Export CSV
+            <Button variant="secondary">
+              <ArrowDownToLine className="h-4 w-4" /> Export CSV
+            </Button>
           </a>
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Link
+      {/* Status filter row — segmented control, not pill buttons */}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-1">
+        <FilterChip
           href={`/${siteSlug}/forms`}
-          className={`rounded-full border px-3 py-1 text-xs ${!sp.status || sp.status === "all" ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-white" : "border-[var(--color-border-strong)]"}`}
-        >
-          All
-        </Link>
+          label="All"
+          active={!sp.status || sp.status === "all"}
+        />
         {STATUS_COUNTS.map((s) => (
-          <Link
+          <FilterChip
             key={s}
             href={`/${siteSlug}/forms?status=${s}`}
-            className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs ${sp.status === s ? "border-[var(--color-fg)] bg-[var(--color-fg)] text-white" : "border-[var(--color-border-strong)]"}`}
-          >
-            <span className="capitalize">{s.replace("_", " ")}</span>
-            <span className="opacity-70">({counts[s] ?? 0})</span>
-          </Link>
+            label={s.replace("_", " ")}
+            count={counts[s] ?? 0}
+            active={sp.status === s}
+          />
         ))}
       </div>
 
       <FilterBar siteSlug={siteSlug} initialQ={sp.q ?? ""} initialForm={sp.form ?? ""} />
 
-      <div className="overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)]">
-        {submissions.length > 0 ? (
-          <table className="w-full text-sm">
-            <thead className="bg-[var(--color-surface-2)] text-left text-xs uppercase tracking-wider text-[var(--color-fg-subtle)]">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">From</th>
-                <th className="px-4 py-2.5 font-medium">Form</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Received</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-border)]">
-              {submissions.map((s) => {
-                const p = (s.payload ?? {}) as Record<string, string>;
-                const name = p.name ?? p.full_name ?? p.fullName ?? p.email ?? "—";
-                const email = p.email ?? "";
-                return (
-                  <tr key={s.id} className="hover:bg-[var(--color-surface-2)]">
-                    <td className="px-4 py-3">
-                      <Link href={`/${siteSlug}/forms/${s.id}`} className="font-medium hover:underline">
-                        {name}
-                      </Link>
-                      {email && <div className="text-xs text-[var(--color-fg-subtle)]">{email}</div>}
-                    </td>
-                    <td className="px-4 py-3 capitalize text-[var(--color-fg-muted)]">{s.form_name}</td>
-                    <td className="px-4 py-3"><SubmissionStatusPill status={s.status} /></td>
-                    <td className="px-4 py-3 text-[var(--color-fg-muted)]">{formatRelative(s.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="px-6 py-16 text-center">
-            <Inbox className="mx-auto h-6 w-6 text-[var(--color-fg-subtle)]" />
-            <p className="mt-3 text-sm font-medium">Inbox zero</p>
-            <p className="mt-1 text-sm text-[var(--color-fg-muted)]">
-              When someone fills a form on your site it lands here.
-            </p>
-          </div>
-        )}
-      </div>
+      {submissions.length > 0 ? (
+        <DataTable>
+          <THead>
+            <TR>
+              <TH>From</TH>
+              <TH>Form</TH>
+              <TH>Status</TH>
+              <TH align="right">Received</TH>
+            </TR>
+          </THead>
+          <TBody>
+            {submissions.map((s) => {
+              const payload = (s.payload ?? {}) as Record<string, string>;
+              const name = payload.name ?? payload.full_name ?? payload.fullName ?? payload.email ?? "—";
+              const email = payload.email ?? "";
+              return (
+                <TR key={s.id}>
+                  <TD>
+                    <Link
+                      href={`/${siteSlug}/forms/${s.id}`}
+                      className="block text-[14px] font-medium hover:underline underline-offset-4"
+                    >
+                      {name}
+                    </Link>
+                    {email && (
+                      <div className="mt-0.5 font-mono text-[11px] text-[var(--color-fg-subtle)]">
+                        {email}
+                      </div>
+                    )}
+                  </TD>
+                  <TD muted mono>
+                    {s.form_name}
+                  </TD>
+                  <TD>
+                    <SubmissionStatusPill status={s.status} />
+                  </TD>
+                  <TD muted align="right" mono>
+                    {formatRelative(s.created_at)}
+                  </TD>
+                </TR>
+              );
+            })}
+          </TBody>
+        </DataTable>
+      ) : (
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <Empty
+            icon={Inbox}
+            title="Inbox zero"
+            hint="When someone fills a form on your site it lands here in seconds. Try a test submission from the live site to confirm wiring."
+          />
+        </div>
+      )}
     </div>
+  );
+}
+
+function FilterChip({
+  href,
+  label,
+  count,
+  active,
+}: {
+  href: string;
+  label: string;
+  count?: number;
+  active?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] capitalize transition",
+        active
+          ? "bg-[var(--color-fg)] text-[var(--color-bg)]"
+          : "text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-fg)]",
+      )}
+    >
+      <span>{label}</span>
+      {count !== undefined && (
+        <span
+          className={cn(
+            "tabular text-[10.5px]",
+            active ? "opacity-70" : "text-[var(--color-fg-subtle)]",
+          )}
+        >
+          {count}
+        </span>
+      )}
+    </Link>
   );
 }
