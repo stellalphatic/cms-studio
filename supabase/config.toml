@@ -1,0 +1,19 @@
+# Supabase project config.
+# Used when deploying via `supabase functions deploy …` from this directory.
+#
+# When this file is present, the CLI honors per-function settings. If you
+# instead deploy through the dashboard, you need to toggle
+# "Verify JWT with legacy secret" OFF on submit-form manually — otherwise
+# the gateway returns CORS-blocked 401s and browsers show "Failed to fetch".
+
+project_id = "studio"
+
+[functions.submit-form]
+# Public POST endpoint. We do our own auth (Turnstile + site lookup) and
+# never read the apikey/JWT, so disabling gateway verification removes the
+# need to send VITE_SUPABASE_ANON_KEY from the client.
+verify_jwt = false
+
+[functions.dispatch-builds]
+# Internal cron — should always require auth.
+verify_jwt = true

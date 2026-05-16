@@ -203,23 +203,38 @@ save. Now any "Publish" in Studio triggers a rebuild within ~30 seconds
 
 ## 5. Forms
 
-Public sites POST to the **Edge Function** `submit-form`:
+Public sites POST to the **CMS URL** — same domain as content reads.
+Supabase is never exposed to the browser:
 
 ```ts
-await fetch("https://YOUR-PROJECT.functions.supabase.co/submit-form", {
+await fetch(`${import.meta.env.VITE_CMS_URL}/api/v1/sites/${import.meta.env.VITE_CMS_SITE}/submit-form`, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
-    site: "acme",
-    form: "contact",
-    fields: { name, email, message },
-    turnstileToken,           // from <Turnstile />
+    form_name: "contact",
+    payload: { name, email, message },     // anything you want stored
+    turnstileToken,                         // from <Turnstile />, optional
   }),
 });
 ```
 
-Submissions show up in Studio → `acme` → Submissions. If the site has a
-Resend key + notify emails configured (Settings), the owner gets an email.
+Or with the SDK:
+
+```ts
+await cms.submitForm({
+  form_name: "contact",
+  payload: { name, email, message },
+});
+```
+
+Submissions show up in Studio → workspace → Submissions. If the site has
+a Resend key + notify emails configured (Settings), the owner gets an
+email immediately.
+
+The legacy Supabase Edge Function (`/functions/v1/submit-form`) is still
+shipped for power users and internal automation, but the CMS endpoint is
+the recommended public surface — it's whitelabelable, requires no anon
+key, and keeps the backend invisible.
 
 ## 6. Whitelabel CMS subdomain (optional)
 

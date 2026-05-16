@@ -33,68 +33,61 @@ export default async function IntegrationPage({
     .order("created_at", { ascending: false });
 
   const studioUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "https://your-studio.example.com").replace(/\/$/, "");
-
-  // Derive the Supabase Functions base from the Supabase URL.
-  // https://abc.supabase.co  -> https://abc.functions.supabase.co/submit-form
-  const supaUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/\/$/, "");
-  let formsUrl = `${supaUrl.replace(/^https:\/\/([a-z0-9-]+)\.supabase\.co$/, "https://$1.functions.supabase.co")}/submit-form`;
-  if (!supaUrl) formsUrl = "https://YOUR-PROJECT.functions.supabase.co/submit-form";
+  const formsUrl = `${studioUrl}/api/v1/sites/${site.slug}/submit-form`;
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
   const activeKeyCount = keys?.length ?? 0;
   const samplePrefix = keys?.[0]?.prefix ?? "sk_xxxx";
 
   // Vite (Kingsbridge, SearchHub, Clona)
-  const viteEnv = `# ─── Studio CMS ───────────────────────────────────────────────
+  const viteEnv = `# ─── Studio CMS — single source of truth ─────────────────────
+# Browser-exposed (used by the contact form).
 VITE_CMS_URL=${studioUrl}
 VITE_CMS_SITE=${site.slug}
-VITE_CMS_API_KEY=<paste-the-secret-from-API-Keys>
 
-# ─── Forms (Supabase Edge Function) ──────────────────────────
-VITE_FORMS_URL=${formsUrl}
-VITE_FORMS_SITE=${site.slug}
-${turnstileSiteKey ? `VITE_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "VITE_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
-`;
-
-  // Astro (Vantage)
-  const astroEnv = `# ─── Studio CMS ───────────────────────────────────────────────
+# Server-only (used by scripts/fetch-content.ts during build).
 CMS_URL=${studioUrl}
 CMS_SITE=${site.slug}
 CMS_API_KEY=<paste-the-secret-from-API-Keys>
 
-# ─── Forms (Supabase Edge Function) ──────────────────────────
-PUBLIC_FORMS_URL=${formsUrl}
-PUBLIC_FORMS_SITE=${site.slug}
-${turnstileSiteKey ? `PUBLIC_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "PUBLIC_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
+${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nVITE_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "# Optional: VITE_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
+`;
+
+  // Astro (Vantage)
+  const astroEnv = `# ─── Studio CMS — single source of truth ─────────────────────
+# Browser-exposed.
+PUBLIC_CMS_URL=${studioUrl}
+PUBLIC_CMS_SITE=${site.slug}
+
+# Server-only.
+CMS_URL=${studioUrl}
+CMS_SITE=${site.slug}
+CMS_API_KEY=<paste-the-secret-from-API-Keys>
+
+${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nPUBLIC_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "# Optional: PUBLIC_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
 `;
 
   // Next.js (future sites)
-  const nextEnv = `# ─── Studio CMS ───────────────────────────────────────────────
+  const nextEnv = `# ─── Studio CMS — single source of truth ─────────────────────
 NEXT_PUBLIC_CMS_URL=${studioUrl}
 NEXT_PUBLIC_CMS_SITE=${site.slug}
 CMS_API_KEY=<paste-the-secret-from-API-Keys>
 
-# ─── Forms (Supabase Edge Function) ──────────────────────────
-NEXT_PUBLIC_FORMS_URL=${formsUrl}
-NEXT_PUBLIC_FORMS_SITE=${site.slug}
-${turnstileSiteKey ? `NEXT_PUBLIC_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "NEXT_PUBLIC_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
+${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nNEXT_PUBLIC_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "# Optional: NEXT_PUBLIC_TURNSTILE_SITE_KEY=<from Cloudflare Turnstile>"}
 `;
 
   const curlList = `curl -H "Authorization: Bearer ${samplePrefix}…" \\
-  ${studioUrl}/api/v1/sites/${site.slug}/blog_posts`;
+  ${studioUrl}/api/v1/sites/${site.slug}/blog-posts`;
 
   const curlSingle = `curl -H "Authorization: Bearer ${samplePrefix}…" \\
-  ${studioUrl}/api/v1/sites/${site.slug}/blog_posts/<slug>`;
+  ${studioUrl}/api/v1/sites/${site.slug}/blog-posts/<slug>`;
 
-  const curlForm = `curl -X POST ${formsUrl} \\
+  const curlForm = `curl -X POST '${formsUrl}' \\
   -H "Content-Type: application/json" \\
   -d '{
-    "site": "${site.slug}",
-    "form": "contact",
-    "name": "Ada Lovelace",
-    "email": "ada@example.com",
-    "message": "Hello!",
-    "turnstileToken": "<from widget>"
+    "form_name": "contact",
+    "payload": { "name": "Ada Lovelace", "email": "ada@example.com", "message": "Hello!" },
+    "turnstileToken": ""
   }'`;
 
   return (
@@ -151,6 +144,33 @@ ${turnstileSiteKey ? `NEXT_PUBLIC_TURNSTILE_SITE_KEY=${turnstileSiteKey}` : "NEX
           ) is the public identifier — the full secret is shown once and
           should be stored as a CI/host environment variable.
         </p>
+      </Section>
+
+      {/* ── Unified endpoint note ── */}
+      <Section title="One endpoint, one domain">
+        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 text-[13px] leading-relaxed text-[var(--color-fg-muted)]">
+          <p>
+            Both content reads <i>and</i> form submissions happen on the CMS
+            URL. Your public site only ever talks to{" "}
+            <code className="rounded bg-[var(--color-surface-2)] px-1 py-0.5 font-mono text-[11px]">
+              {studioUrl.replace(/^https?:\/\//, "")}
+            </code>{" "}
+            — Supabase is never exposed to the browser, no anon keys, no
+            gateway gymnastics. Whitelabel the CMS subdomain to{" "}
+            <code className="rounded bg-[var(--color-surface-2)] px-1 py-0.5 font-mono text-[11px]">cms.acme.com</code>{" "}
+            and clients see only their own brand.
+          </p>
+          <div className="mt-3 grid gap-1.5 font-mono text-[11.5px]">
+            <div className="text-[var(--color-fg)]">
+              <span className="text-[var(--color-fg-subtle)]">GET&nbsp;&nbsp;</span>
+              {studioUrl}/api/v1/sites/{site.slug}/blog-posts
+            </div>
+            <div className="text-[var(--color-fg)]">
+              <span className="text-[var(--color-fg-subtle)]">POST </span>
+              {formsUrl}
+            </div>
+          </div>
+        </div>
       </Section>
 
       {/* ── API smoke tests ── */}

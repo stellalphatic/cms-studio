@@ -118,5 +118,37 @@ export function createCmsClient(opts: CmsClientOptions) {
       const { data } = await this.list<T>(type, { slug });
       return data[0] ?? null;
     },
+
+    /**
+     * Submit a form. Posts to the CMS URL (not Supabase directly), so the
+     * client site doesn't need to know anything about the backend.
+     *
+     *   await cms.submitForm({
+     *     form_name: "contact",
+     *     payload: { name, email, message },
+     *     turnstileToken,    // optional
+     *   });
+     */
+    async submitForm(input: {
+      form_name?: string;
+      payload: Record<string, unknown>;
+      turnstileToken?: string;
+    }): Promise<{ ok: true; id: string }> {
+      const url = `${baseUrl}/api/v1/sites/${opts.site}/submit-form`;
+      const res = await fetchImpl(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          form_name: input.form_name ?? "contact",
+          payload: input.payload,
+          turnstileToken: input.turnstileToken ?? "",
+        }),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`[@studio/cms] submitForm ${res.status}: ${text || res.statusText}`);
+      }
+      return (await res.json()) as { ok: true; id: string };
+    },
   };
 }

@@ -67,15 +67,27 @@ with `.list(type, opts?)`, `.get(type, slug)`, and `.site()`.
 Add a section to `.env.example` (copy from Studio → Integration page).
 Variable names — use these exact names:
 
-| Framework    | CMS base                | CMS site slug        | API key             | Forms URL                    | Forms site             | Turnstile public          |
-| ------------ | ----------------------- | -------------------- | ------------------- | ---------------------------- | ---------------------- | ------------------------- |
-| **Vite**     | `VITE_CMS_URL`          | `VITE_CMS_SITE`      | `VITE_CMS_API_KEY`  | `VITE_FORMS_URL`             | `VITE_FORMS_SITE`      | `VITE_TURNSTILE_SITE_KEY` |
-| **Astro**    | `CMS_URL`               | `CMS_SITE`           | `CMS_API_KEY`       | `PUBLIC_FORMS_URL`           | `PUBLIC_FORMS_SITE`    | `PUBLIC_TURNSTILE_SITE_KEY` |
-| **Next.js**  | `NEXT_PUBLIC_CMS_URL`   | `NEXT_PUBLIC_CMS_SITE` | `CMS_API_KEY`     | `NEXT_PUBLIC_FORMS_URL`      | `NEXT_PUBLIC_FORMS_SITE` | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` |
+There are just **three** variables to wire (plus optional Turnstile).
+Same names per framework, only the public-prefix differs:
 
-`CMS_API_KEY` is **server-only** — never bundle it into client-side JS in
-Next.js. In Vite/Astro static sites it's only used at build time inside
+| Framework   | Public CMS URL          | Public CMS site         | Server CMS API key | Optional Turnstile public          |
+| ----------- | ----------------------- | ----------------------- | ------------------ | ---------------------------------- |
+| **Vite**    | `VITE_CMS_URL`          | `VITE_CMS_SITE`         | `CMS_API_KEY`      | `VITE_TURNSTILE_SITE_KEY`          |
+| **Astro**   | `PUBLIC_CMS_URL`        | `PUBLIC_CMS_SITE`       | `CMS_API_KEY`      | `PUBLIC_TURNSTILE_SITE_KEY`        |
+| **Next.js** | `NEXT_PUBLIC_CMS_URL`   | `NEXT_PUBLIC_CMS_SITE`  | `CMS_API_KEY`      | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`   |
+
+For Vite/Astro you may also see `CMS_URL` and `CMS_SITE` without a
+prefix — those are used by `scripts/fetch-content.ts` (Node, server-side
+only). It's fine to set both `VITE_CMS_URL` and `CMS_URL` to the same
+value.
+
+`CMS_API_KEY` is **server-only** — never bundle it into client-side JS.
+In Vite/Astro static sites it's only used at build time inside
 `scripts/fetch-content.ts`, which runs in Node before the bundler sees it.
+
+The form submission endpoint lives on the CMS URL itself
+(`{CMS_URL}/api/v1/sites/{CMS_SITE}/submit-form`) — no Supabase URL or
+anon key is ever exposed to the browser.
 
 ## 3. Write the build-time fetch script
 
@@ -144,26 +156,61 @@ delete the prefetch step to revert.
 
 ## 5. Wire the forms endpoint
 
-Find any existing contact form in the repo and rewrite its `onSubmit` to
-POST JSON to the Supabase Edge Function. The exact shape is:
+Forms POST to the **CMS URL** — same domain as content reads. The
+Supabase backend is never exposed to the browser, so there are no
+gateway keys, no extra env vars, no CORS gymnastics.
 
-```ts
-const res = await fetch(import.meta.env.VITE_FORMS_URL, {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: JSON.stringify({
-    site: import.meta.env.VITE_FORMS_SITE,
-    form: "contact",        // any short id; appears in Submissions list
-    name, email, message,
-    turnstileToken,         // from <Turnstile siteKey={...} />
-  }),
-});
-if (!res.ok) throw new Error((await res.json()).error ?? "Failed");
+Endpoint:
+
+```
+POST {VITE_CMS_URL}/api/v1/sites/{VITE_CMS_SITE}/submit-form
 ```
 
-Add Cloudflare Turnstile widget rendering if the site doesn't already
-have it. Server-side validation is done inside the Edge Function — the
-form just needs to send `turnstileToken`.
+Body:
+
+```json
+{
+  "form_name": "contact",
+  "payload": { "name": "…", "email": "…", "message": "…" },
+  "turnstileToken": ""
+}
+```
+
+Pattern (Vite/React example — adapt for the framework you find):
+
+```ts
+const res = await fetch(
+  `${import.meta.env.VITE_CMS_URL}/api/v1/sites/${import.meta.env.VITE_CMS_SITE}/submit-form`,
+  {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      form_name: "contact",            // any short id; shows in Submissions
+      payload: { name, email, message, /* + any other fields */ },
+      turnstileToken,                  // optional; from <Turnstile /> widget
+    }),
+  },
+);
+if (!res.ok) {
+  const text = await res.text().catch(() => "");
+  throw new Error(`HTTP ${res.status} ${text}`);
+}
+```
+
+If the project already vendors `@studio/cms` (recommended), prefer the
+one-liner:
+
+```ts
+await cms.submitForm({
+  form_name: "contact",
+  payload: { name, email, message },
+});
+```
+
+Cloudflare Turnstile is optional. If `TURNSTILE_SECRET_KEY` is unset on
+Studio, verification is skipped; add the widget only if the client wants
+spam protection — it auto-injects `cf-turnstile-response` into the
+form's FormData.
 
 ## 6. SEO + sitemap
 

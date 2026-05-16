@@ -102,8 +102,8 @@ export function Sidebar({
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-5">
         <Section label="Overview">
-          <SidebarNav href={`/${site.slug}`} icon={LayoutDashboard} label="Dashboard" exact />
-          <SidebarNav href={`/${site.slug}/forms`} icon={Inbox} label="Submissions" />
+          <SidebarNav href={`/${site.slug}`} icon={<LayoutDashboard />} label="Dashboard" exact />
+          <SidebarNav href={`/${site.slug}/forms`} icon={<Inbox />} label="Submissions" />
         </Section>
 
         <Section label="Content">
@@ -114,20 +114,20 @@ export function Sidebar({
               <SidebarNav
                 key={ct.key}
                 href={`/${site.slug}/${route}`}
-                icon={Icon}
+                icon={<Icon />}
                 label={ct.pluralLabel}
               />
             );
           })}
-          <SidebarNav href={`/${site.slug}/media`} icon={ImageIcon} label="Media" />
+          <SidebarNav href={`/${site.slug}/media`} icon={<ImageIcon />} label="Media" />
         </Section>
 
         {hasRole(role, "admin") && (
           <Section label="Manage">
-            <SidebarNav href={`/${site.slug}/people`} icon={Users} label="People" />
-            <SidebarNav href={`/${site.slug}/api-keys`} icon={KeyRound} label="API keys" />
-            <SidebarNav href={`/${site.slug}/integration`} icon={Plug} label="Integration" />
-            <SidebarNav href={`/${site.slug}/settings`} icon={Settings} label="Settings" />
+            <SidebarNav href={`/${site.slug}/people`} icon={<Users />} label="People" />
+            <SidebarNav href={`/${site.slug}/api-keys`} icon={<KeyRound />} label="API keys" />
+            <SidebarNav href={`/${site.slug}/integration`} icon={<Plug />} label="Integration" />
+            <SidebarNav href={`/${site.slug}/settings`} icon={<Settings />} label="Settings" />
           </Section>
         )}
       </nav>

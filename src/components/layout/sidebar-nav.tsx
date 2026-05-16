@@ -4,14 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+/**
+ * The `icon` prop is a pre-rendered ReactNode, not a component. This matters:
+ * passing a forwardRef component (every lucide icon) from a Server Component
+ * to a Client Component is forbidden in Next 15 because functions aren't
+ * serialisable across the RSC boundary. JSX elements ARE serialisable.
+ */
 export function SidebarNav({
   href,
-  icon: Icon,
+  icon,
   label,
   exact,
 }: {
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ReactNode;
   label: string;
   exact?: boolean;
 }) {
@@ -36,12 +42,16 @@ export function SidebarNav({
             : "text-[var(--color-fg)]/85 hover:bg-[var(--color-surface-2)] hover:text-[var(--color-fg)]",
         )}
       >
-        <Icon
+        <span
           className={cn(
-            "h-[15px] w-[15px] transition-colors",
-            active ? "text-[var(--color-fg)]" : "text-[var(--color-fg-subtle)] group-hover:text-[var(--color-fg)]",
+            "inline-flex h-[15px] w-[15px] shrink-0 items-center justify-center transition-colors [&_svg]:h-[15px] [&_svg]:w-[15px]",
+            active
+              ? "text-[var(--color-fg)]"
+              : "text-[var(--color-fg-subtle)] group-hover:text-[var(--color-fg)]",
           )}
-        />
+        >
+          {icon}
+        </span>
         <span className="truncate">{label}</span>
       </Link>
     </li>
