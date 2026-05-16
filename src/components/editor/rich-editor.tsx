@@ -8,18 +8,21 @@ import Placeholder from "@tiptap/extension-placeholder";
 import {
   Bold,
   Code,
+  Film,
   Heading1,
   Heading2,
   Heading3,
   Image as ImageIcon,
   Italic,
   Link as LinkIcon,
+  Link2,
   List,
   ListOrdered,
   Quote as QuoteIcon,
   Redo2,
   Strikethrough,
   Undo2,
+  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
@@ -86,6 +89,33 @@ export function RichEditor({
     [editor, siteId],
   );
 
+  const insertImageByUrl = useCallback(() => {
+    if (!editor) return;
+    const url = window.prompt("Image URL (jpg, png, gif, webp)");
+    if (!url) return;
+    const alt = window.prompt("Alt text (for accessibility & SEO)") ?? "";
+    editor.chain().focus().setImage({ src: url, alt }).run();
+  }, [editor]);
+
+  const insertEmbed = useCallback(() => {
+    if (!editor) return;
+    const url = window.prompt(
+      "Embed URL (YouTube, Vimeo, Loom, or any iframe-able link)",
+    );
+    if (!url) return;
+    const src = normalizeEmbedUrl(url);
+    // Inline raw <iframe> via insertContent — preserves on save because the
+    // body is stored as HTML and rendered with the same HTML on the public
+    // sites.
+    editor
+      .chain()
+      .focus()
+      .insertContent(
+        `<div class="embed"><iframe src="${escapeAttr(src)}" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="width:100%;aspect-ratio:16/9;border:0;border-radius:8px"></iframe></div><p></p>`,
+      )
+      .run();
+  }, [editor]);
+
   if (!editor) return null;
 
   const toolbar = (
@@ -138,8 +168,14 @@ export function RichEditor({
       >
         <LinkIcon className="h-3.5 w-3.5" />
       </Tool>
-      <Tool onClick={() => fileInputRef.current?.click()} title="Insert image">
+      <Tool onClick={() => fileInputRef.current?.click()} title="Upload image">
+        <Upload className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool onClick={insertImageByUrl} title="Insert image by URL">
         <ImageIcon className="h-3.5 w-3.5" />
+      </Tool>
+      <Tool onClick={insertEmbed} title="Embed video / iframe (YouTube, Vimeo, Loom…)">
+        <Film className="h-3.5 w-3.5" />
       </Tool>
       <input
         ref={fileInputRef}
@@ -201,4 +237,44 @@ function Tool({
       {children}
     </button>
   );
+}
+
+// Used to silence an unused-import warning for an icon we may want to keep
+// available for future bullet/list refactors.
+void Link2;
+
+function escapeAttr(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+}
+
+/**
+ * Convert common watch URLs into embeddable equivalents. Anything else is
+ * passed through unchanged so users can paste raw embed/iframe links.
+ */
+function normalizeEmbedUrl(input: string): string {
+  try {
+    const u = new URL(input);
+    const host = u.hostname.replace(/^www\./, "");
+    // YouTube — watch / share / shorts → embed
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const id = u.searchParams.get("v") ?? u.pathname.split("/").pop();
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (host === "youtu.be") {
+      const id = u.pathname.replace(/^\//, "");
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    // Vimeo — vimeo.com/<id> → player.vimeo.com/video/<id>
+    if (host === "vimeo.com") {
+      const id = u.pathname.split("/").filter(Boolean)[0];
+      if (id && /^\d+$/.test(id)) return `https://player.vimeo.com/video/${id}`;
+    }
+    // Loom — loom.com/share/<id> → loom.com/embed/<id>
+    if (host === "loom.com" && u.pathname.startsWith("/share/")) {
+      return `https://www.loom.com/embed/${u.pathname.replace("/share/", "")}`;
+    }
+    return input;
+  } catch {
+    return input;
+  }
 }

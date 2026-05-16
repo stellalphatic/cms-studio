@@ -3,19 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
+  Calendar,
   ChevronDown,
-  Image as ImageIcon,
   Loader2,
   Settings2,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Section } from "@/components/ui/surface";
+import { MediaPicker } from "@/components/ui/media-picker";
+import { AuthorPicker, type AuthorOption } from "@/components/ui/author-picker";
 import { RichEditor } from "@/components/editor/rich-editor";
-import { uploadMedia } from "@/lib/media-upload";
 import { cn, slugify } from "@/lib/utils";
 import type { BlogPost, ContentStatus } from "@/lib/supabase/types";
 
@@ -24,6 +24,8 @@ interface Props {
   siteId: string;
   initial?: Partial<BlogPost>;
   customFields?: Array<{ key: string; label: string; type: string; help?: string }>;
+  authors: AuthorOption[];
+  initialAuthor?: { name: string; avatarUrl: string | null };
   onSubmit: (formData: FormData) => Promise<void>;
   onDelete?: () => Promise<void>;
 }
@@ -31,25 +33,43 @@ interface Props {
 const SEO_TITLE_MAX = 60;
 const SEO_DESC_MAX = 160;
 
-export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, onDelete }: Props) {
+/** ISO → "2025-05-17T14:30" for <input type="datetime-local"> */
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function BlogForm({
+  siteSlug: _siteSlug,
+  siteId,
+  initial,
+  customFields,
+  authors,
+  initialAuthor,
+  onSubmit,
+  onDelete,
+}: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [title, setTitle] = useState(initial?.title ?? "");
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [body, setBody] = useState(initial?.body_html ?? "");
   const [coverUrl, setCoverUrl] = useState(initial?.cover_url ?? "");
+  const [coverAlt, setCoverAlt] = useState(initial?.cover_alt ?? "");
   const [status, setStatus] = useState<ContentStatus>(initial?.status ?? "draft");
   const [excerpt, setExcerpt] = useState(initial?.excerpt ?? "");
   const [category, setCategory] = useState(initial?.category ?? "");
   const [tags, setTags] = useState((initial?.tags ?? []).join(", "));
-  const [coverUploading, setCoverUploading] = useState(false);
+  const [publishedAt, setPublishedAt] = useState(toLocalInput(initial?.published_at));
   const [seoTitle, setSeoTitle] = useState(((initial?.seo as Record<string, string>)?.title as string) ?? "");
   const [seoDesc, setSeoDesc] = useState(((initial?.seo as Record<string, string>)?.description as string) ?? "");
   const [customJson, setCustomJson] = useState(
     JSON.stringify(initial?.custom_fields ?? {}, null, 2),
   );
 
-  // Approx 230 wpm reading speed on the rendered HTML
   const wordCount = (body.replace(/<[^>]*>/g, " ").match(/\b\w+\b/g) ?? []).length;
   const readingTime = Math.max(1, Math.round(wordCount / 230));
 
@@ -58,25 +78,21 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
     if (!initial?.id) setSlug(slugify(next));
   };
 
-  async function handleCoverFile(file: File) {
-    setCoverUploading(true);
-    const url = await uploadMedia({ file, siteId });
-    setCoverUploading(false);
-    if (url) setCoverUrl(url);
-  }
-
   function submit(formData: FormData) {
     formData.set("title", title);
     formData.set("slug", slug || slugify(title));
     formData.set("body_html", body);
     formData.set("cover_url", coverUrl ?? "");
+    formData.set("cover_alt", coverAlt ?? "");
     formData.set("status", status);
     formData.set("excerpt", excerpt ?? "");
     formData.set("category", category ?? "");
     formData.set("tags", tags);
+    formData.set("published_at", publishedAt);
     formData.set("seo_title", seoTitle);
     formData.set("seo_description", seoDesc);
     formData.set("custom_fields", customJson);
+    // author_name + author_avatar_url come from AuthorPicker's named inputs
     start(async () => {
       try {
         await onSubmit(formData);
@@ -93,8 +109,7 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
       {/* CANVAS — the editorial focus area */}
       <div className="min-w-0">
         <div className="editor-canvas">
-          {/* Slug indicator — visible but quiet, above the title */}
-          <div className="mb-6 flex items-center gap-2 font-mono text-[11.5px] text-[var(--color-fg-subtle)]">
+          <div className="mb-6 flex flex-wrap items-center gap-2 font-mono text-[11.5px] text-[var(--color-fg-subtle)]">
             <span>/{slug || "post-slug"}</span>
             <span aria-hidden>·</span>
             <span className="tabular">{wordCount} words</span>
@@ -116,13 +131,12 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
             />
           </div>
 
-          {/* Cover preview rendered inline so writers see it like readers will */}
           {coverUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={coverUrl}
-              alt=""
-              className="mt-8 aspect-[2/1] w-full rounded-lg object-cover"
+              alt={coverAlt ?? ""}
+              className="mt-8 aspect-[2/1] w-full rounded-lg object-cover ring-1 ring-[var(--color-border)]"
             />
           )}
 
@@ -130,13 +144,9 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
             <RichEditor value={body} onChange={setBody} siteId={siteId} bare />
           </div>
 
-          {/* Collapsible secondary sections — kept out of the writer's way */}
           <Disclosure label="SEO" hint="Search engines and social previews" defaultOpen={Boolean(seoTitle || seoDesc)}>
             <div className="space-y-4 pt-2">
-              <Field
-                label="Meta title"
-                hint={`${seoTitle.length} / ${SEO_TITLE_MAX}`}
-              >
+              <Field label="Meta title" hint={`${seoTitle.length} / ${SEO_TITLE_MAX}`}>
                 <Input
                   value={seoTitle}
                   onChange={(e) => setSeoTitle(e.target.value)}
@@ -144,10 +154,7 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
                   placeholder={title || "Defaults to the post title"}
                 />
               </Field>
-              <Field
-                label="Meta description"
-                hint={`${seoDesc.length} / ${SEO_DESC_MAX}`}
-              >
+              <Field label="Meta description" hint={`${seoDesc.length} / ${SEO_DESC_MAX}`}>
                 <Textarea
                   value={seoDesc}
                   onChange={(e) => setSeoDesc(e.target.value)}
@@ -203,13 +210,31 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
                   <option value="archived">Archived</option>
                 </Select>
               </Field>
+              <Field
+                label="Publish date"
+                hint={publishedAt ? "Will display this date" : "Auto-set on publish"}
+              >
+                <div className="relative">
+                  <input
+                    type="datetime-local"
+                    value={publishedAt}
+                    onChange={(e) => setPublishedAt(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 pr-8 text-sm text-[var(--color-fg)] transition hover:border-[var(--color-border-strong)] focus-visible:border-[var(--color-brand)]"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
+                </div>
+              </Field>
               <Button type="submit" size="lg" disabled={pending} className="w-full">
                 {pending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Saving…
                   </>
-                ) : status === "published" ? "Publish" : "Save draft"}
+                ) : status === "published" ? (
+                  "Publish"
+                ) : (
+                  "Save draft"
+                )}
               </Button>
               {onDelete && initial?.id && (
                 <button
@@ -233,6 +258,14 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
             </div>
           </Section>
 
+          <Section title="Authorship">
+            <AuthorPicker
+              authors={authors}
+              initialName={initialAuthor?.name ?? ""}
+              initialAvatarUrl={initialAuthor?.avatarUrl ?? ""}
+            />
+          </Section>
+
           <Section title="Slug">
             <Input
               value={slug}
@@ -243,41 +276,17 @@ export function BlogForm({ siteSlug, siteId, initial, customFields, onSubmit, on
           </Section>
 
           <Section title="Cover image">
-            {coverUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverUrl} alt="" className="aspect-[16/10] w-full rounded-md object-cover" />
-            ) : (
-              <label className="grid aspect-[16/10] cursor-pointer place-items-center rounded-md border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-2)] text-[var(--color-fg-subtle)] transition hover:bg-[var(--color-surface-3)]">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void handleCoverFile(f);
-                  }}
-                />
-                <div className="text-center">
-                  {coverUploading ? (
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Upload className="mx-auto h-5 w-5" />
-                      <div className="mt-2 text-[11.5px]">Click to upload</div>
-                    </>
-                  )}
-                </div>
-              </label>
-            )}
+            <MediaPicker value={coverUrl ?? ""} onChange={setCoverUrl} siteId={siteId} aspect="16/10" />
             {coverUrl && (
-              <button
-                type="button"
-                onClick={() => setCoverUrl("")}
-                className="mt-2 inline-flex items-center gap-1 text-[11.5px] text-[var(--color-fg-subtle)] hover:text-[var(--color-fg)]"
-              >
-                <ImageIcon className="h-3 w-3" />
-                Replace
-              </button>
+              <div className="mt-3">
+                <Field label="Alt text" hint="Describes the image for screen readers and SEO">
+                  <Input
+                    value={coverAlt ?? ""}
+                    onChange={(e) => setCoverAlt(e.target.value)}
+                    placeholder="A close-up of a typewriter"
+                  />
+                </Field>
+              </div>
             )}
           </Section>
 
@@ -377,7 +386,8 @@ function SearchPreview({
       </div>
       <div className="truncate text-[12px] text-emerald-700 dark:text-emerald-400">
         yoursite.com<span className="text-[var(--color-fg-subtle)]"> › </span>blog
-        <span className="text-[var(--color-fg-subtle)]"> › </span>{slug || "post"}
+        <span className="text-[var(--color-fg-subtle)]"> › </span>
+        {slug || "post"}
       </div>
       <div className="mt-1 truncate text-[18px] leading-snug text-[#1a0dab] dark:text-[#8ab4f8]">
         {title || "(untitled)"}

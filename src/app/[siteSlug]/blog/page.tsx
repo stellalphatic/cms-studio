@@ -23,15 +23,19 @@ export default async function BlogListPage({
 
   const { data: posts } = await supabase
     .from("blog_posts")
-    .select("id, title, slug, status, published_at, updated_at, category")
+    .select(
+      "id, title, slug, status, published_at, updated_at, category, author:authors(name, avatar_url)",
+    )
     .eq("site_id", site.id)
     .order("updated_at", { ascending: false });
 
-  const list =
-    (posts as Pick<
-      BlogPost,
-      "id" | "title" | "slug" | "status" | "published_at" | "updated_at" | "category"
-    >[]) ?? [];
+  type Row = Pick<
+    BlogPost,
+    "id" | "title" | "slug" | "status" | "published_at" | "updated_at" | "category"
+  > & {
+    author: { name: string; avatar_url: string | null } | null;
+  };
+  const list = (posts as unknown as Row[]) ?? [];
 
   return (
     <div>
@@ -53,6 +57,7 @@ export default async function BlogListPage({
             <TR>
               <TH>Title</TH>
               <TH>Status</TH>
+              <TH>Author</TH>
               <TH>Category</TH>
               <TH align="right">Published</TH>
               <TH align="right">Updated</TH>
@@ -77,6 +82,27 @@ export default async function BlogListPage({
                 </TD>
                 <TD>
                   <ContentStatusPill status={p.status} />
+                </TD>
+                <TD>
+                  {p.author ? (
+                    <span className="inline-flex items-center gap-2">
+                      {p.author.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={p.author.avatar_url}
+                          alt=""
+                          className="h-5 w-5 rounded-full object-cover ring-1 ring-[var(--color-border)]"
+                        />
+                      ) : (
+                        <span className="grid h-5 w-5 place-items-center rounded-full bg-[var(--color-surface-2)] text-[9px] font-semibold text-[var(--color-fg-muted)]">
+                          {p.author.name.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                      <span className="text-[12.5px] text-[var(--color-fg)]">{p.author.name}</span>
+                    </span>
+                  ) : (
+                    <span className="text-[var(--color-fg-subtle)]">—</span>
+                  )}
                 </TD>
                 <TD muted>{p.category ?? "—"}</TD>
                 <TD muted align="right" mono>

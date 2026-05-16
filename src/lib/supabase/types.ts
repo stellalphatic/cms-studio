@@ -70,6 +70,17 @@ export interface SiteMembership extends SiteMember {
   site: Site;
 }
 
+export interface Author {
+  id: string;
+  site_id: string;
+  name: string;
+  slug: string;
+  bio: string | null;
+  avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BlogPost {
   id: string;
   site_id: string;

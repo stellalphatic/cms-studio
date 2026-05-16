@@ -19,14 +19,25 @@ export default async function EditBlogPostPage({
   const { site } = await requireSiteAccess(siteSlug);
   const supabase = await createSupabaseServerClient();
 
-  const { data: post } = await supabase
-    .from("blog_posts")
-    .select("*")
-    .eq("id", id)
-    .eq("site_id", site.id)
-    .maybeSingle<BlogPost>();
+  const [{ data: post }, { data: authors }] = await Promise.all([
+    supabase
+      .from("blog_posts")
+      .select("*")
+      .eq("id", id)
+      .eq("site_id", site.id)
+      .maybeSingle<BlogPost>(),
+    supabase
+      .from("authors")
+      .select("id, name, slug, avatar_url")
+      .eq("site_id", site.id)
+      .order("name"),
+  ]);
 
   if (!post) notFound();
+
+  const initialAuthor = post.author_id
+    ? authors?.find((a) => a.id === post.author_id)
+    : undefined;
 
   const schema = getSiteSchema(siteSlug);
   const blogConfig = schema?.contentTypes.find((c) => c.key === "blog_posts");
@@ -64,6 +75,12 @@ export default async function EditBlogPostPage({
         siteId={site.id}
         initial={post}
         customFields={blogConfig?.customFields}
+        authors={authors ?? []}
+        initialAuthor={
+          initialAuthor
+            ? { name: initialAuthor.name, avatarUrl: initialAuthor.avatar_url }
+            : undefined
+        }
         onSubmit={async (fd) => {
           "use server";
           await updateBlogPost(siteSlug, id, fd);

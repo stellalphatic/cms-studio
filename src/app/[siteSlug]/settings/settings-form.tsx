@@ -64,8 +64,37 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
 
       <SettingSection
         title="Branding"
-        description="Colors used in this workspace and on the public preview. Tagline appears on the dashboard."
+        description="Logo, colors and tagline used in this workspace's sidebar and on whitelabel CMS subdomains."
       >
+        <Field
+          label="Logo URL"
+          hint="Square works best, e.g. 256×256. Paste a hosted URL (S3, Cloudinary, /brands/foo.svg)"
+        >
+          <div className="flex items-center gap-3">
+            {site.brand?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={site.brand.logo}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-[var(--color-border)]"
+              />
+            ) : (
+              <div
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-[11px] font-semibold text-white"
+                style={{ background: site.brand?.primary ?? "oklch(0.55 0.2 275)" }}
+              >
+                {site.name.charAt(0)}
+              </div>
+            )}
+            <Input
+              name="brand_logo"
+              defaultValue={site.brand?.logo ?? ""}
+              disabled={!canEdit}
+              placeholder="https://cdn.example.com/logo.svg"
+              className="font-mono text-[12px]"
+            />
+          </div>
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Primary color" hint="Buttons & accents">
             <Input

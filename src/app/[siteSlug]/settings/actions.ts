@@ -11,6 +11,7 @@ const settingsSchema = z.object({
   name: z.string().min(1).max(120),
   primary_domain: z.string().max(200).optional().nullable(),
   cms_domain: z.string().max(200).optional().nullable(),
+  brand_logo: z.string().max(500).optional().nullable(),
   brand_primary: z.string().max(20).optional().nullable(),
   brand_accent: z.string().max(20).optional().nullable(),
   brand_tagline: z.string().max(200).optional().nullable(),
@@ -29,6 +30,7 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
     name: String(formData.get("name") ?? ""),
     primary_domain: String(formData.get("primary_domain") ?? "") || null,
     cms_domain: String(formData.get("cms_domain") ?? "") || null,
+    brand_logo: String(formData.get("brand_logo") ?? "") || null,
     brand_primary: String(formData.get("brand_primary") ?? "") || null,
     brand_accent: String(formData.get("brand_accent") ?? "") || null,
     brand_tagline: String(formData.get("brand_tagline") ?? "") || null,
@@ -48,6 +50,7 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
       cms_domain: input.cms_domain?.toLowerCase() || null,
       brand: {
         ...site.brand,
+        logo: input.brand_logo ?? site.brand?.logo,
         primary: input.brand_primary ?? site.brand?.primary,
         accent: input.brand_accent ?? site.brand?.accent,
         tagline: input.brand_tagline ?? site.brand?.tagline,

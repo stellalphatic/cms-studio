@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { getSiteSchema } from "@/lib/schemas";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BlogForm } from "../blog-form";
 import { createBlogPost } from "../actions";
 
@@ -16,6 +17,12 @@ export default async function NewBlogPostPage({
   const { site } = await requireSiteAccess(siteSlug);
   const schema = getSiteSchema(siteSlug);
   const blogConfig = schema?.contentTypes.find((c) => c.key === "blog_posts");
+  const supabase = await createSupabaseServerClient();
+  const { data: authors } = await supabase
+    .from("authors")
+    .select("id, name, slug, avatar_url")
+    .eq("site_id", site.id)
+    .order("name");
 
   return (
     <div>
@@ -33,6 +40,7 @@ export default async function NewBlogPostPage({
         siteSlug={siteSlug}
         siteId={site.id}
         customFields={blogConfig?.customFields}
+        authors={authors ?? []}
         onSubmit={async (fd) => {
           "use server";
           await createBlogPost(siteSlug, fd);

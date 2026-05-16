@@ -37,7 +37,9 @@ export default async function WorkspaceLayout({
 
   return (
     <div className="min-h-svh bg-[var(--color-bg)]" style={themeStyle}>
-      <div className="grid min-h-svh grid-cols-[240px_minmax(0,1fr)]">
+      {/* grid items default to align-self:stretch which breaks `sticky` on
+          children. items-start lets the sidebar stick at top:0 cleanly. */}
+      <div className="grid min-h-svh grid-cols-[240px_minmax(0,1fr)] items-start">
         <Sidebar site={site} schema={schema} role={role} />
         <div className="flex min-w-0 flex-col">
           <Topbar

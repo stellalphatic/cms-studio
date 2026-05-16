@@ -2,14 +2,22 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2, Trash2, Upload } from "lucide-react";
+import { Calendar, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/input";
 import { Section } from "@/components/ui/surface";
-import { uploadMedia } from "@/lib/media-upload";
+import { MediaPicker } from "@/components/ui/media-picker";
 import { slugify } from "@/lib/utils";
 import type { CaseStudy, ContentStatus } from "@/lib/supabase/types";
+
+function toLocalInput(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 interface Props {
   siteSlug: string;
@@ -36,7 +44,7 @@ export function CaseForm({ siteSlug: _siteSlug, siteId, initial, onSubmit, onDel
   const [metricsJson, setMetricsJson] = useState(JSON.stringify(initial?.metrics ?? [], null, 2));
   const [chartJson, setChartJson] = useState(JSON.stringify(initial?.chart ?? [], null, 2));
   const [status, setStatus] = useState<ContentStatus>(initial?.status ?? "draft");
-  const [uploading, setUploading] = useState(false);
+  const [publishedAt, setPublishedAt] = useState(toLocalInput(initial?.published_at));
 
   const titleChanged = (next: string) => {
     setTitle(next);
@@ -58,6 +66,7 @@ export function CaseForm({ siteSlug: _siteSlug, siteId, initial, onSubmit, onDel
     formData.set("metrics", metricsJson);
     formData.set("chart", chartJson);
     formData.set("status", status);
+    formData.set("published_at", publishedAt);
     start(async () => {
       try {
         await onSubmit(formData);
@@ -158,6 +167,20 @@ export function CaseForm({ siteSlug: _siteSlug, siteId, initial, onSubmit, onDel
                   <option value="archived">Archived</option>
                 </Select>
               </Field>
+              <Field
+                label="Publish date"
+                hint={publishedAt ? "Will display this date" : "Auto-set on publish"}
+              >
+                <div className="relative">
+                  <input
+                    type="datetime-local"
+                    value={publishedAt}
+                    onChange={(e) => setPublishedAt(e.target.value)}
+                    className="h-10 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 pr-8 text-sm text-[var(--color-fg)] transition hover:border-[var(--color-border-strong)] focus-visible:border-[var(--color-brand)]"
+                  />
+                  <Calendar className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--color-fg-subtle)]" />
+                </div>
+              </Field>
               <Button type="submit" size="lg" disabled={pending} className="w-full">
                 {pending ? (
                   <>
@@ -188,45 +211,7 @@ export function CaseForm({ siteSlug: _siteSlug, siteId, initial, onSubmit, onDel
           </Section>
 
           <Section title="Hero image">
-            {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={imageUrl} alt="" className="aspect-[16/10] w-full rounded-md object-cover" />
-            ) : (
-              <label className="grid aspect-[16/10] cursor-pointer place-items-center rounded-md border border-dashed border-[var(--color-border-strong)] bg-[var(--color-surface-2)] text-[var(--color-fg-subtle)] transition hover:bg-[var(--color-surface-3)]">
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    setUploading(true);
-                    const url = await uploadMedia({ file: f, siteId });
-                    setUploading(false);
-                    if (url) setImageUrl(url);
-                  }}
-                />
-                <div className="text-center">
-                  {uploading ? (
-                    <Loader2 className="mx-auto h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Upload className="mx-auto h-5 w-5" />
-                      <div className="mt-2 text-[11.5px]">Click to upload</div>
-                    </>
-                  )}
-                </div>
-              </label>
-            )}
-            <div className="mt-3">
-              <Field label="Image URL">
-                <Input
-                  value={imageUrl ?? ""}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="font-mono text-[12px]"
-                />
-              </Field>
-            </div>
+            <MediaPicker value={imageUrl ?? ""} onChange={setImageUrl} siteId={siteId} aspect="16/10" />
           </Section>
         </div>
       </aside>

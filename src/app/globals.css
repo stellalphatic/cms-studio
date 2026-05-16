@@ -174,6 +174,13 @@ body { min-height: 100vh; }
   margin: 1.5rem 0;
   max-width: 100%;
 }
+.ProseMirror .embed {
+  margin: 1.75rem 0;
+}
+.ProseMirror .embed iframe {
+  display: block;
+  border-radius: 8px;
+}
 .ProseMirror code {
   font-family: var(--font-mono), ui-monospace, monospace;
   background: var(--color-surface-2);

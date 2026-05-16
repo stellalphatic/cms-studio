@@ -18,12 +18,72 @@ const blogSchema = z.object({
   category: z.string().max(80).optional().nullable(),
   tags: z.array(z.string()).default([]),
   status: z.enum(["draft", "scheduled", "published", "archived"]),
-  published_at: z.string().datetime().optional().nullable(),
-  scheduled_for: z.string().datetime().optional().nullable(),
+  published_at: z.string().optional().nullable(),
+  scheduled_for: z.string().optional().nullable(),
+  author_name: z.string().max(120).optional().nullable(),
+  author_avatar_url: z.string().max(500).optional().nullable(),
   seo_title: z.string().max(160).optional().nullable(),
   seo_description: z.string().max(320).optional().nullable(),
   custom_fields: z.record(z.string(), z.unknown()).default({}),
 });
+
+/**
+ * Coerce a value from <input type="datetime-local"> (e.g. "2025-05-17T14:30")
+ * into a Postgres-safe ISO string. Returns null for empty input. Passthrough
+ * for already-ISO values.
+ */
+function toIsoOrNull(v?: string | null): string | null {
+  if (!v) return null;
+  // already ISO with timezone — keep as-is
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(v)) return v;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
+
+/**
+ * Find or create the per-site author by name. Cheap upsert because each site
+ * has a unique (site_id, slug) constraint. Returns the author id, or null if
+ * no name was provided. Avatar URL is updated when supplied so renaming an
+ * existing author by the same name refreshes their picture.
+ */
+async function resolveAuthorId(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  siteId: string,
+  name?: string | null,
+  avatarUrl?: string | null,
+): Promise<string | null> {
+  if (!name?.trim()) return null;
+  const cleanName = name.trim().slice(0, 120);
+  const slug = slugify(cleanName) || cleanName.toLowerCase().replace(/\s+/g, "-");
+
+  const { data: existing } = await supabase
+    .from("authors")
+    .select("id, avatar_url")
+    .eq("site_id", siteId)
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (existing) {
+    if (avatarUrl && avatarUrl !== existing.avatar_url) {
+      await supabase.from("authors").update({ avatar_url: avatarUrl }).eq("id", existing.id);
+    }
+    return existing.id;
+  }
+
+  const { data: created, error } = await supabase
+    .from("authors")
+    .insert({
+      site_id: siteId,
+      name: cleanName,
+      slug,
+      avatar_url: avatarUrl || null,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+  return created.id;
+}
 
 type BlogInput = z.infer<typeof blogSchema>;
 
@@ -50,8 +110,10 @@ function parseFormData(formData: FormData): BlogInput {
     category: String(formData.get("category") ?? "") || null,
     tags,
     status: (String(formData.get("status") ?? "draft") as BlogInput["status"]) || "draft",
-    published_at: String(formData.get("published_at") ?? "") || null,
-    scheduled_for: String(formData.get("scheduled_for") ?? "") || null,
+    published_at: toIsoOrNull(String(formData.get("published_at") ?? "")),
+    scheduled_for: toIsoOrNull(String(formData.get("scheduled_for") ?? "")),
+    author_name: String(formData.get("author_name") ?? "") || null,
+    author_avatar_url: String(formData.get("author_avatar_url") ?? "") || null,
     seo_title: String(formData.get("seo_title") ?? "") || null,
     seo_description: String(formData.get("seo_description") ?? "") || null,
     custom_fields: custom,
@@ -69,6 +131,13 @@ export async function createBlogPost(siteSlug: string, formData: FormData) {
     input.published_at = new Date().toISOString();
   }
 
+  const authorId = await resolveAuthorId(
+    supabase,
+    site.id,
+    input.author_name,
+    input.author_avatar_url,
+  );
+
   const { data, error } = await supabase
     .from("blog_posts")
     .insert({
@@ -79,6 +148,7 @@ export async function createBlogPost(siteSlug: string, formData: FormData) {
       body_html: input.body_html,
       cover_url: input.cover_url || null,
       cover_alt: input.cover_alt,
+      author_id: authorId,
       category: input.category,
       tags: input.tags,
       status: input.status,
@@ -120,6 +190,13 @@ export async function updateBlogPost(siteSlug: string, id: string, formData: For
     input.published_at = new Date().toISOString();
   }
 
+  const authorId = await resolveAuthorId(
+    supabase,
+    site.id,
+    input.author_name,
+    input.author_avatar_url,
+  );
+
   const { error } = await supabase
     .from("blog_posts")
     .update({
@@ -129,6 +206,7 @@ export async function updateBlogPost(siteSlug: string, id: string, formData: For
       body_html: input.body_html,
       cover_url: input.cover_url || null,
       cover_alt: input.cover_alt,
+      author_id: authorId,
       category: input.category,
       tags: input.tags,
       status: input.status,

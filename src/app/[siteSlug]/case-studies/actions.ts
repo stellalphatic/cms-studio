@@ -23,7 +23,16 @@ const caseSchema = z.object({
   outcomes: z.array(z.string()).default([]),
   stack: z.array(z.string()).default([]),
   status: z.enum(["draft", "scheduled", "published", "archived"]),
+  published_at: z.string().optional().nullable(),
 });
+
+function toIsoOrNull(v?: string | null): string | null {
+  if (!v) return null;
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(v)) return v;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
 
 type Input = z.infer<typeof caseSchema>;
 
@@ -58,6 +67,7 @@ function parseFD(formData: FormData): Input {
       .map((s) => s.trim())
       .filter(Boolean),
     status: (String(formData.get("status") ?? "draft") as Input["status"]) || "draft",
+    published_at: toIsoOrNull(String(formData.get("published_at") ?? "")),
   });
 }
 
@@ -72,7 +82,9 @@ export async function createCaseStudy(siteSlug: string, formData: FormData) {
       site_id: site.id,
       ...input,
       image_url: input.image_url || null,
-      published_at: input.status === "published" ? new Date().toISOString() : null,
+      published_at:
+        input.published_at ||
+        (input.status === "published" ? new Date().toISOString() : null),
       created_by: ctx.user.id,
       updated_by: ctx.user.id,
     })
@@ -101,7 +113,8 @@ export async function updateCaseStudy(siteSlug: string, id: string, formData: Fo
       ...input,
       image_url: input.image_url || null,
       published_at:
-        input.status === "published" ? new Date().toISOString() : null,
+        input.published_at ||
+        (input.status === "published" ? new Date().toISOString() : null),
       updated_by: ctx.user.id,
     })
     .eq("id", id)
