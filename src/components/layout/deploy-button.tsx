@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Rocket, Settings, X } from "lucide-react"; // CheckCircle2 used by Up-to-date chip
 import Link from "next/link";
@@ -45,6 +46,25 @@ export function DeployButton({
     const t = setInterval(() => setRelative(relativeTime(lastDeployedAt)), 30_000);
     return () => clearInterval(t);
   }, [lastDeployedAt]);
+
+  // Lock body scroll + close on Escape while the modal is open. Also
+  // guarantees `document` is available before we try to portal (Next 15
+  // server-renders this component into HTML before hydration).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !pending) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, pending]);
 
   const hasChanges = pendingCount > 0;
 
@@ -120,24 +140,26 @@ export function DeployButton({
         </span>
       </button>
 
-      {open && (
+      {open && mounted && createPortal(
         <div
           role="dialog"
           aria-modal
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
+          aria-labelledby="deploy-dialog-title"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-6"
         >
           <div
             className="absolute inset-0"
             onClick={() => !pending && setOpen(false)}
             aria-hidden
           />
-          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] shadow-2xl">
+          <div className="relative my-auto w-full max-w-md overflow-hidden rounded-2xl border border-[var(--color-border)] bg-[var(--color-bg)] shadow-2xl">
             <header className="flex items-start justify-between border-b border-[var(--color-border)] px-6 py-5">
               <div>
                 <div className="font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-fg-subtle)]">
                   Manual deploy
                 </div>
                 <h2
+                  id="deploy-dialog-title"
                   className="mt-1 text-[20px] font-semibold tracking-tight"
                   style={{ fontFamily: "var(--font-serif), serif" }}
                 >
@@ -219,7 +241,8 @@ export function DeployButton({
               )}
             </footer>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
