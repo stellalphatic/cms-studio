@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { ExternalLink, LogOut } from "lucide-react";
 import type { Site, SiteRole } from "@/lib/supabase/types";
+import { hasRole } from "@/lib/auth";
+import { SiteLogo } from "@/components/brand/site-logo";
 import { ThemeToggle } from "./theme-toggle";
 import { SectionCrumb } from "./section-crumb";
+import { DeployButton } from "./deploy-button";
 
 export function Topbar({
   site,
@@ -10,12 +13,16 @@ export function Topbar({
   user,
   allMemberships: _allMemberships,
   isWhitelabel: _isWhitelabel = false,
+  pendingCount = 0,
+  lastDeployedAt = null,
 }: {
   site: Site;
   role: SiteRole;
   user: { email: string; fullName: string | null };
   allMemberships: Array<{ site: Site; role: SiteRole }>;
   isWhitelabel?: boolean;
+  pendingCount?: number;
+  lastDeployedAt?: string | null;
 }) {
   const initial = (user.fullName ?? user.email).charAt(0).toUpperCase();
 
@@ -28,12 +35,13 @@ export function Topbar({
           href={`/${site.slug}`}
           className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1 transition hover:bg-[var(--color-surface-2)]"
         >
-          <span
-            className="grid h-5 w-5 place-items-center rounded text-[9px] font-semibold text-white"
-            style={{ background: site.brand?.primary ?? "oklch(0.55 0.2 275)" }}
-          >
-            {site.name.charAt(0)}
-          </span>
+          <SiteLogo
+            logoUrl={site.brand?.logo}
+            domain={site.primary_domain}
+            primary={site.brand?.primary}
+            size={20}
+            rounded="md"
+          />
           <span
             className="font-medium text-[var(--color-fg)]"
             style={{ fontFamily: "var(--font-serif), serif" }}
@@ -53,6 +61,13 @@ export function Topbar({
       </div>
 
       <div className="flex items-center gap-1.5">
+        <DeployButton
+          siteSlug={site.slug}
+          pendingCount={pendingCount}
+          lastDeployedAt={lastDeployedAt}
+          hasWebhook={Boolean(site.amplify_webhook_url)}
+          canDeploy={hasRole(role, "editor")}
+        />
         {site.primary_domain && (
           <a
             href={`https://${site.primary_domain}`}

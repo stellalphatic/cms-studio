@@ -29,7 +29,7 @@ export function PageForm({
   siteSlug: string;
   siteId: string;
   initial?: PageInitial;
-  onSubmit: (fd: FormData) => Promise<void>;
+  onSubmit: (fd: FormData) => Promise<void | { id?: string }>;
   onDelete?: () => Promise<void>;
 }) {
   const router = useRouter();
@@ -57,11 +57,24 @@ export function PageForm({
     fd.set("seo_description", seoDesc);
     start(async () => {
       try {
-        await onSubmit(fd);
+        const result = await onSubmit(fd);
         toast.success(initial?.id ? "Saved" : "Created");
-        router.refresh();
+        if (result && "id" in result && result.id && !initial?.id) {
+          router.push(`/${_siteSlug}/pages/${result.id}?created=1`);
+        } else {
+          router.refresh();
+        }
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Save failed");
+        const digest = (e as { digest?: string })?.digest;
+        const message = e instanceof Error ? e.message : String(e);
+        if (
+          message === "NEXT_REDIRECT" ||
+          message === "NEXT_NOT_FOUND" ||
+          (typeof digest === "string" && digest.startsWith("NEXT_"))
+        ) {
+          return;
+        }
+        toast.error(message || "Save failed");
       }
     });
   }

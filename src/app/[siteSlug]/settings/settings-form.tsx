@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { SiteLogo } from "@/components/brand/site-logo";
 import { updateSiteSettings } from "./actions";
 import type { Site } from "@/lib/supabase/types";
 
@@ -68,24 +69,16 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
       >
         <Field
           label="Logo URL"
-          hint="Square works best, e.g. 256×256. Paste a hosted URL (S3, Cloudinary, /brands/foo.svg)"
+          hint="Paste an absolute https:// URL. Leave blank to auto-fetch the favicon from your primary domain, with a Studio-branded fallback."
         >
           <div className="flex items-center gap-3">
-            {site.brand?.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={site.brand.logo}
-                alt=""
-                className="h-10 w-10 shrink-0 rounded-md object-cover ring-1 ring-[var(--color-border)]"
-              />
-            ) : (
-              <div
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-[11px] font-semibold text-white"
-                style={{ background: site.brand?.primary ?? "oklch(0.55 0.2 275)" }}
-              >
-                {site.name.charAt(0)}
-              </div>
-            )}
+            <SiteLogo
+              logoUrl={site.brand?.logo}
+              domain={site.primary_domain}
+              primary={site.brand?.primary}
+              size={40}
+              rounded="md"
+            />
             <Input
               name="brand_logo"
               defaultValue={site.brand?.logo ?? ""}
@@ -200,7 +193,10 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             placeholder="Notifications <hello@example.com>"
           />
         </Field>
-        <Field label="Notify emails" hint="Comma separated">
+        <Field
+          label="Notify emails"
+          hint="Comma separated. Leave blank to auto-notify every owner + admin on this site."
+        >
           <Input
             name="notify_emails"
             defaultValue={(site.notify_emails ?? []).join(", ")}
@@ -222,6 +218,39 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
             disabled={!canEdit}
             placeholder="https://example.com, https://www.example.com"
             className="font-mono text-[12px]"
+          />
+        </Field>
+      </SettingSection>
+
+      <SettingSection
+        title="Form spam defense · Cloudflare Turnstile"
+        description="Enable per-site by filling BOTH fields. Empty = no captcha is enforced, so the form posts straight through. Get keys at dash.cloudflare.com/?to=/:account/turnstile."
+      >
+        <Field
+          label="Site key (public)"
+          hint="Goes into your site's VITE_TURNSTILE_SITE_KEY env so the widget renders."
+        >
+          <Input
+            name="turnstile_site_key"
+            defaultValue={site.turnstile_site_key ?? ""}
+            disabled={!canEdit}
+            placeholder="0x4AAAAA…"
+            className="font-mono text-[12px]"
+            autoComplete="off"
+          />
+        </Field>
+        <Field
+          label="Secret key"
+          hint="Server-only. Studio uses this to verify the widget response."
+        >
+          <Input
+            name="turnstile_secret_key"
+            defaultValue={site.turnstile_secret_key ?? ""}
+            disabled={!canEdit}
+            placeholder="0x4AAAAA…"
+            className="font-mono text-[12px]"
+            type="password"
+            autoComplete="off"
           />
         </Field>
       </SettingSection>

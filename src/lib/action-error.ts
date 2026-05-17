@@ -1,6 +1,31 @@
 import { z } from "zod";
 
 /**
+ * Detect Next.js framework signals (redirect / notFound). These are
+ * thrown as sentinel errors that MUST bubble up to the framework so it
+ * can perform the redirect or render the 404; if we wrap them, the user
+ * sees a "NEXT_REDIRECT" toast.
+ *
+ * Across Next versions the sentinel surfaces three different ways:
+ *   - `error.message === "NEXT_REDIRECT"`
+ *   - `error.digest` starts with `"NEXT_REDIRECT;"`
+ *   - both
+ * We accept any of them.
+ */
+export function isFrameworkSignal(e: unknown): boolean {
+  if (!e || typeof e !== "object") return false;
+  const message = (e as { message?: unknown }).message;
+  if (typeof message === "string" && (message === "NEXT_REDIRECT" || message === "NEXT_NOT_FOUND")) {
+    return true;
+  }
+  const digest = (e as { digest?: unknown }).digest;
+  if (typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest.startsWith("NEXT_NOT_FOUND"))) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * In production Next.js sanitises errors thrown from Server Actions into the
  * unhelpful "An error occurred in the Server Components render…" string.
  * Wrap every action body with `withAction("name", async () => …)` so that:
@@ -14,17 +39,7 @@ export async function withAction<T>(name: string, fn: () => Promise<T>): Promise
   try {
     return await fn();
   } catch (e) {
-    // next/navigation throws these as sentinels — let them propagate untouched.
-    if (e instanceof Error && (e.message === "NEXT_REDIRECT" || e.message === "NEXT_NOT_FOUND")) {
-      throw e;
-    }
-    // Some Next sentinels expose a `digest` instead of a message.
-    if (e && typeof e === "object" && "digest" in e) {
-      const d = String((e as { digest: unknown }).digest ?? "");
-      if (d.startsWith("NEXT_REDIRECT") || d.startsWith("NEXT_NOT_FOUND")) {
-        throw e;
-      }
-    }
+    if (isFrameworkSignal(e)) throw e;
 
     if (e instanceof z.ZodError) {
       const first = e.issues[0];
@@ -36,7 +51,6 @@ export async function withAction<T>(name: string, fn: () => Promise<T>): Promise
 
     const message = e instanceof Error ? e.message : String(e);
     console.error(`[action:${name}]`, message, e);
-    // Re-throw with the original message so the client toast is meaningful.
     throw new Error(message || `Action "${name}" failed`);
   }
 }

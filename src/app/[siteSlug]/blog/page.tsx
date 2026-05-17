@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { PenLine, FileText } from "lucide-react";
-import { requireSiteAccess } from "@/lib/auth";
+import { hasRole, requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { ContentStatusPill } from "@/components/ui/status-pill";
 import { DataTable, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Empty } from "@/components/ui/surface";
 import { formatDate, formatRelative } from "@/lib/utils";
 import type { BlogPost } from "@/lib/supabase/types";
+import { StatusToggle } from "./status-toggle";
 
 export const metadata = { title: "Blog" };
 
@@ -18,7 +18,8 @@ export default async function BlogListPage({
   params: Promise<{ siteSlug: string }>;
 }) {
   const { siteSlug } = await params;
-  const { site } = await requireSiteAccess(siteSlug);
+  const { site, role } = await requireSiteAccess(siteSlug);
+  const canEdit = hasRole(role, "editor");
   const supabase = await createSupabaseServerClient();
 
   const { data: posts } = await supabase
@@ -81,7 +82,13 @@ export default async function BlogListPage({
                   </div>
                 </TD>
                 <TD>
-                  <ContentStatusPill status={p.status} />
+                  <StatusToggle
+                    siteSlug={siteSlug}
+                    postId={p.id}
+                    postTitle={p.title}
+                    status={p.status}
+                    canEdit={canEdit}
+                  />
                 </TD>
                 <TD>
                   {p.author ? (

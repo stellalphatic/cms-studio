@@ -33,6 +33,8 @@ export interface Site {
   notify_emails: string[];
   cms_domain: string | null;
   allowed_origins: string[];
+  turnstile_site_key: string | null;
+  turnstile_secret_key: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -26,7 +26,12 @@ interface Props {
   customFields?: Array<{ key: string; label: string; type: string; help?: string }>;
   authors: AuthorOption[];
   initialAuthor?: { name: string; avatarUrl: string | null };
-  onSubmit: (formData: FormData) => Promise<void>;
+  /**
+   * Server action. May return `{ redirectTo }` if it wants the client to
+   * navigate after success (preferred over `redirect()` from the action, which
+   * can leak a NEXT_REDIRECT toast through useTransition).
+   */
+  onSubmit: (formData: FormData) => Promise<void | { redirectTo?: string }>;
   onDelete?: () => Promise<void>;
 }
 
@@ -95,11 +100,26 @@ export function BlogForm({
     // author_name + author_avatar_url come from AuthorPicker's named inputs
     start(async () => {
       try {
-        await onSubmit(formData);
+        const result = await onSubmit(formData);
         toast.success(initial?.id ? "Saved" : "Created");
-        router.refresh();
+        if (result && "redirectTo" in result && result.redirectTo) {
+          router.push(result.redirectTo);
+        } else {
+          router.refresh();
+        }
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Save failed");
+        // Suppress NEXT_REDIRECT / NEXT_NOT_FOUND — those are framework
+        // signals that occur during a successful redirect, not real errors.
+        const digest = (e as { digest?: string })?.digest;
+        const message = e instanceof Error ? e.message : String(e);
+        if (
+          message === "NEXT_REDIRECT" ||
+          message === "NEXT_NOT_FOUND" ||
+          (typeof digest === "string" && digest.startsWith("NEXT_"))
+        ) {
+          return;
+        }
+        toast.error(message || "Save failed");
       }
     });
   }

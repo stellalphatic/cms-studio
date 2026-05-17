@@ -4,6 +4,7 @@ import { Topbar } from "@/components/layout/topbar";
 import { requireSiteAccess } from "@/lib/auth";
 import { getSiteSchema } from "@/lib/schemas";
 import { getWhitelabelSite } from "@/lib/host";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function WorkspaceLayout({
   children,
@@ -35,6 +36,26 @@ export default async function WorkspaceLayout({
     ? ({ "--color-brand": site.brand.primary } as React.CSSProperties)
     : undefined;
 
+  // Pending-changes counter for the Deploy button. We count queued build_jobs
+  // (one row per content INSERT/UPDATE/DELETE that affects published output)
+  // and the most recent dispatch so we can show "Last deployed N ago".
+  const supabase = await createSupabaseServerClient();
+  const [{ count: pendingCount }, { data: lastDeploy }] = await Promise.all([
+    supabase
+      .from("build_jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("site_id", site.id)
+      .eq("status", "queued"),
+    supabase
+      .from("build_jobs")
+      .select("dispatched_at")
+      .eq("site_id", site.id)
+      .eq("status", "dispatched")
+      .order("dispatched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle<{ dispatched_at: string | null }>(),
+  ]);
+
   return (
     <div className="min-h-svh bg-[var(--color-bg)]" style={themeStyle}>
       {/* grid items default to align-self:stretch which breaks `sticky` on
@@ -48,6 +69,8 @@ export default async function WorkspaceLayout({
             user={{ email: ctx.user.email, fullName: ctx.profile.full_name }}
             allMemberships={visibleMemberships}
             isWhitelabel={Boolean(whitelabel)}
+            pendingCount={pendingCount ?? 0}
+            lastDeployedAt={lastDeploy?.dispatched_at ?? null}
           />
           <main className="min-w-0 flex-1 px-10 py-10">
             <div className="mx-auto w-full max-w-[1180px]">{children}</div>

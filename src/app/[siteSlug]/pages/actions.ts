@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { hasRole, requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -68,7 +67,7 @@ export async function createPage(siteSlug: string, formData: FormData) {
       diff: { title: input.title, slug: input.slug },
     });
     revalidatePath(`/${siteSlug}/pages`);
-    redirect(`/${siteSlug}/pages/${data.id}?created=1`);
+    return { id: data.id as string };
   });
 }
 
@@ -122,6 +121,5 @@ export async function deletePage(siteSlug: string, id: string) {
       entity_id: id,
     });
     revalidatePath(`/${siteSlug}/pages`);
-    redirect(`/${siteSlug}/pages`);
   });
 }

@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -181,7 +180,7 @@ export async function createBlogPost(siteSlug: string, formData: FormData) {
     });
 
     revalidatePath(`/${siteSlug}/blog`);
-    redirect(`/${siteSlug}/blog/${data.id}?created=1`);
+    return { id: data.id as string };
   });
 }
 
@@ -258,6 +257,44 @@ export async function deleteBlogPost(siteSlug: string, id: string) {
       entity_id: id,
     });
     revalidatePath(`/${siteSlug}/blog`);
-    redirect(`/${siteSlug}/blog`);
+  });
+}
+
+export async function setBlogStatus(
+  siteSlug: string,
+  id: string,
+  status: "draft" | "scheduled" | "published" | "archived",
+) {
+  return withAction("setBlogStatus", async () => {
+    const { ctx, site } = await requireSiteAccess(siteSlug);
+    const supabase = await createSupabaseServerClient();
+    const patch: Record<string, unknown> = { status, updated_by: ctx.user.id };
+    if (status === "published") {
+      // Stamp published_at if it isn't already set, so the date shows the
+      // moment the editor actually shipped it.
+      const { data: existing } = await supabase
+        .from("blog_posts")
+        .select("published_at")
+        .eq("id", id)
+        .eq("site_id", site.id)
+        .maybeSingle<{ published_at: string | null }>();
+      if (!existing?.published_at) patch.published_at = new Date().toISOString();
+    }
+    const { error } = await supabase
+      .from("blog_posts")
+      .update(patch)
+      .eq("id", id)
+      .eq("site_id", site.id);
+    if (error) throw new Error(error.message);
+    await logAudit({
+      site_id: site.id,
+      actor_id: ctx.user.id,
+      action: "status",
+      entity: "blog_posts",
+      entity_id: id,
+      diff: { status },
+    });
+    revalidatePath(`/${siteSlug}/blog`);
+    revalidatePath(`/${siteSlug}/blog/${id}`);
   });
 }

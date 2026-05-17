@@ -138,20 +138,72 @@ begin
   return coalesce(new, old);
 end$$;
 
--- Re-attach the trigger to every content table that uses it (idempotent).
+-- Re-attach the trigger only to tables whose rows are the published output.
+-- Author + media changes don't change what's on the live site unless
+-- referenced by a published post, in which case the post's own update will
+-- enqueue. Triggering on every author insert (we auto-create authors when
+-- saving a draft) caused the Deploy button to pulse for non-publish edits.
 do $$
 declare t text;
 begin
+  -- Always drop the trigger first so old installs are cleaned up too.
   for t in
     select unnest(array[
       'blog_posts','case_studies','testimonials','faqs','pages',
-      'immigration_pathways','pricing_tiers','bulk_tiers','authors'
+      'immigration_pathways','pricing_tiers','bulk_tiers','authors','media'
     ])
   loop
     execute format('drop trigger if exists %1$s_enqueue_build on public.%1$s', t);
+  end loop;
+
+  for t in
+    select unnest(array[
+      'blog_posts','case_studies','testimonials','faqs','pages',
+      'immigration_pathways','pricing_tiers','bulk_tiers'
+    ])
+  loop
     execute format(
       'create trigger %1$s_enqueue_build after insert or update or delete on public.%1$s for each row execute function public.enqueue_build_job()',
       t
     );
   end loop;
 end$$;
+
+-- Clear out any stale queued jobs that came from the old, noisier trigger so
+-- the Deploy button doesn't show a phantom pending count on first load.
+delete from public.build_jobs
+where status = 'queued'
+  and trigger like 'authors:%';
+delete from public.build_jobs
+where status = 'queued'
+  and trigger like 'media:%';
+
+-- ============================================================================
+-- Per-site Cloudflare Turnstile config
+--
+-- Captcha used to be enforced globally any time TURNSTILE_SECRET_KEY existed
+-- as an env var. That meant the moment you set the secret on Vercel, every
+-- site was forced to ship a widget — including SearchHub which had none, so
+-- every submission failed with "captcha_failed".
+--
+-- New rule: a site enforces Turnstile only when BOTH columns are filled in
+-- its own row (Studio → Settings → "Form spam defense"). Empty = no captcha.
+-- ============================================================================
+
+alter table public.sites
+  add column if not exists turnstile_site_key text,
+  add column if not exists turnstile_secret_key text;
+
+-- ============================================================================
+-- Wipe stale relative brand.logo values
+--
+-- Seeded sites shipped with placeholder paths like '/brands/searchhub.svg'.
+-- Those resolve against the Studio host (which doesn't serve that file) and
+-- render as a broken-image icon. Clearing the value lets SiteLogo fall back
+-- to the favicon proxy → StudioMark chain.
+-- ============================================================================
+
+update public.sites
+set brand = brand - 'logo'
+where brand ? 'logo'
+  and (brand->>'logo') !~ '^https?://';

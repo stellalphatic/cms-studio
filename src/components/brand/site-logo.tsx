@@ -1,20 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { StudioMark } from "./studio-mark";
 
 /**
- * Sidebar / workspace identifier mark.
+ * Workspace logo with a hardened, multi-step fallback chain. The goal is
+ * "never render a broken image" — every step has its own onError that
+ * advances to the next, and the final step is an inline SVG that cannot
+ * fail to render.
  *
- * Priority:
- *   1. Explicit `brand.logo` URL set in Studio settings (best — branded).
- *   2. Google's free favicon proxy for the site's primary_domain
- *      (https://www.google.com/s2/favicons?domain=…&sz=64). Works for
- *      virtually every site; resilient when DNS is up. Falls back gracefully.
- *   3. A small inline StudioMark on top of the site's primary brand color —
- *      reads as "made in Studio" rather than the generic single-letter chip.
- *
- * Client component because <img onError> needs to swap the fallback.
+ *   1. Explicit `brand.logo` if it's an absolute https URL or a real
+ *      path that lives on this Studio (e.g. an uploaded media URL).
+ *   2. Google's favicon proxy for the site's primary_domain. Returns 200
+ *      with a tiny PNG for virtually any live site.
+ *   3. Inline StudioMark on the site's brand color — branded, recognisable,
+ *      definitely not a generic letter chip.
  */
 export function SiteLogo({
   logoUrl,
@@ -31,53 +31,85 @@ export function SiteLogo({
   rounded?: "md" | "lg" | "full";
   className?: string;
 }) {
-  const [explicitFailed, setExplicitFailed] = useState(false);
-  const [faviconFailed, setFaviconFailed] = useState(false);
-
-  const radiusClass = rounded === "full" ? "rounded-full" : rounded === "lg" ? "rounded-lg" : "rounded-md";
+  type Stage = "explicit" | "favicon" | "mark";
+  const radiusClass =
+    rounded === "full" ? "rounded-full" : rounded === "lg" ? "rounded-lg" : "rounded-md";
   const dimension = { width: size, height: size };
 
   const cleanDomain = (domain ?? "")
     .replace(/^https?:\/\//, "")
     .replace(/\/$/, "")
-    .replace(/^www\./, "");
+    .replace(/^www\./, "")
+    .trim();
+
+  // Only honour absolute https URLs for the explicit logo. Relative paths
+  // ("/brands/foo.svg") would resolve to the Studio host and 404, leaving
+  // a broken-image icon. Skip straight to favicon when that happens.
+  const explicitUrl = useMemo(() => {
+    if (!logoUrl) return null;
+    const v = logoUrl.trim();
+    if (!v) return null;
+    if (/^https?:\/\//i.test(v)) return v;
+    return null;
+  }, [logoUrl]);
+
   const faviconUrl = cleanDomain
-    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(cleanDomain)}&sz=${Math.max(64, size * 2)}`
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
+        cleanDomain,
+      )}&sz=${Math.max(64, size * 2)}`
     : null;
 
-  // 1. Explicit logo
-  if (logoUrl && !explicitFailed) {
+  const initialStage: Stage = explicitUrl ? "explicit" : faviconUrl ? "favicon" : "mark";
+  const [stage, setStage] = useState<Stage>(initialStage);
+
+  // Reset stage when the logo / domain changes (Next caches client trees
+  // and re-uses them across workspace switches).
+  useEffect(() => {
+    setStage(initialStage);
+  }, [initialStage]);
+
+  function nextStage() {
+    setStage((current) => {
+      if (current === "explicit" && faviconUrl) return "favicon";
+      return "mark";
+    });
+  }
+
+  const baseClasses = `${radiusClass} shrink-0 ring-1 ring-[var(--color-border)] ${className ?? ""}`;
+
+  if (stage === "explicit" && explicitUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={logoUrl}
+        key={explicitUrl}
+        src={explicitUrl}
         alt=""
         style={dimension}
-        onError={() => setExplicitFailed(true)}
-        className={`${radiusClass} shrink-0 object-cover ring-1 ring-[var(--color-border)] ${className ?? ""}`}
+        onError={nextStage}
+        className={`${baseClasses} object-cover`}
       />
     );
   }
 
-  // 2. Google favicon proxy
-  if (faviconUrl && !faviconFailed) {
+  if (stage === "favicon" && faviconUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        key={faviconUrl}
         src={faviconUrl}
         alt=""
         style={dimension}
         loading="lazy"
-        onError={() => setFaviconFailed(true)}
-        className={`${radiusClass} shrink-0 bg-[var(--color-surface-2)] object-contain p-1 ring-1 ring-[var(--color-border)] ${className ?? ""}`}
+        onError={nextStage}
+        className={`${baseClasses} bg-[var(--color-surface-2)] object-contain p-1`}
       />
     );
   }
 
-  // 3. StudioMark on the site's brand color
+  // Final fallback — inline SVG, can't fail to render.
   return (
     <span
-      className={`${radiusClass} relative grid shrink-0 place-items-center overflow-hidden ring-1 ring-[var(--color-border)] ${className ?? ""}`}
+      className={`${baseClasses} relative grid place-items-center overflow-hidden`}
       style={{
         ...dimension,
         background: primary || "oklch(0.94 0.005 80)",

@@ -20,6 +20,8 @@ const settingsSchema = z.object({
   resend_from_email: z.string().optional().nullable(),
   notify_emails: z.string().optional().default(""),
   allowed_origins: z.string().optional().default(""),
+  turnstile_site_key: z.string().max(200).optional().nullable(),
+  turnstile_secret_key: z.string().max(200).optional().nullable(),
 });
 
 export async function updateSiteSettings(siteSlug: string, formData: FormData) {
@@ -39,6 +41,8 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
     resend_from_email: String(formData.get("resend_from_email") ?? "") || null,
     notify_emails: String(formData.get("notify_emails") ?? ""),
     allowed_origins: String(formData.get("allowed_origins") ?? ""),
+    turnstile_site_key: String(formData.get("turnstile_site_key") ?? "") || null,
+    turnstile_secret_key: String(formData.get("turnstile_secret_key") ?? "") || null,
   });
 
   const supabase = await createSupabaseServerClient();
@@ -66,6 +70,8 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean),
+      turnstile_site_key: input.turnstile_site_key,
+      turnstile_secret_key: input.turnstile_secret_key,
     })
     .eq("id", site.id);
   if (error) throw new Error(error.message);

@@ -23,7 +23,6 @@ import type { Site } from "@/lib/supabase/types";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY ?? "";
 const PLATFORM_ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .map((s) => s.trim())
@@ -51,12 +50,21 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
 
   const { data: site } = await sb
     .from("sites")
-    .select("id, slug, resend_api_key, resend_from_email, notify_emails, allowed_origins")
+    .select(
+      "id, slug, resend_api_key, resend_from_email, notify_emails, allowed_origins, turnstile_site_key, turnstile_secret_key",
+    )
     .eq("slug", siteSlug)
     .maybeSingle<
       Pick<
         Site,
-        "id" | "slug" | "resend_api_key" | "resend_from_email" | "notify_emails" | "allowed_origins"
+        | "id"
+        | "slug"
+        | "resend_api_key"
+        | "resend_from_email"
+        | "notify_emails"
+        | "allowed_origins"
+        | "turnstile_site_key"
+        | "turnstile_secret_key"
       >
     >();
 
@@ -92,8 +100,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
     null;
   const ua = req.headers.get("user-agent");
 
-  if (!(await verifyTurnstile(turnstileToken, ip))) {
-    return json({ error: "captcha_failed" }, 400, cors);
+  // Captcha is opt-in PER SITE. A site only enforces Turnstile when it has
+  // both a site_key (so the widget can render on the client) and a secret_key
+  // (so we can verify the response). Sites that haven't configured both are
+  // submitted straight through — this stops a platform-wide env var from
+  // accidentally locking out every freshly onboarded site.
+  const siteSecret = site.turnstile_secret_key?.trim();
+  const siteKey = site.turnstile_site_key?.trim();
+  if (siteSecret && siteKey) {
+    if (!turnstileToken) {
+      return json({ error: "captcha_required" }, 400, cors);
+    }
+    if (!(await verifyTurnstile(siteSecret, turnstileToken, ip))) {
+      return json({ error: "captcha_failed" }, 400, cors);
+    }
   }
 
   // Defensive: strip leading <script tags from any string value.
@@ -122,12 +142,19 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
   // Fire-and-forget email. Per-site Resend overrides platform default.
   const resendKey = site.resend_api_key ?? process.env.RESEND_API_KEY ?? "";
   const resendFrom = site.resend_from_email ?? process.env.RESEND_FROM_EMAIL ?? "";
-  const notifyList =
-    site.notify_emails ??
-    (process.env[`NOTIFY_${site.slug.toUpperCase()}`] ?? "")
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
+
+  // Recipient resolution, in priority order:
+  //   1. Explicit `notify_emails` list configured in Settings → Form
+  //      notifications. Honoured even if it's an empty array — "I deliberately
+  //      don't want emails" is a valid choice.
+  //   2. Fallback: every site member whose role is owner or admin. This way
+  //      a freshly onboarded site doesn't silently drop the first
+  //      submission. Members below admin (editors/viewers) are NOT included —
+  //      contact emails often contain phone numbers / personal info.
+  let notifyList: string[] = (site.notify_emails ?? []).filter(Boolean);
+  if (notifyList.length === 0) {
+    notifyList = await fallbackRecipients(sb, site.id);
+  }
 
   if (resendKey && resendFrom && notifyList.length) {
     void sendEmail({
@@ -141,6 +168,32 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
   }
 
   return json({ ok: true, id: row.id }, 201, cors);
+}
+
+/**
+ * Returns the email addresses of every owner + admin on the given site.
+ * Used when the workspace hasn't configured an explicit notify list yet.
+ */
+async function fallbackRecipients(
+  sb: ReturnType<typeof createSupabaseAdminClient>,
+  siteId: string,
+): Promise<string[]> {
+  const { data } = await sb
+    .from("site_members")
+    .select("role, profiles:profiles!inner(email)")
+    .eq("site_id", siteId)
+    .in("role", ["owner", "admin"]);
+  type Row = { profiles: { email: string } | { email: string }[] | null };
+  const rows = (data as Row[] | null) ?? [];
+  const emails: string[] = [];
+  for (const r of rows) {
+    if (Array.isArray(r.profiles)) {
+      for (const p of r.profiles) if (p?.email) emails.push(p.email);
+    } else if (r.profiles?.email) {
+      emails.push(r.profiles.email);
+    }
+  }
+  return Array.from(new Set(emails));
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────
@@ -178,10 +231,13 @@ function json(data: unknown, status: number, cors: HeadersInit) {
   return new NextResponse(JSON.stringify(data), { status, headers });
 }
 
-async function verifyTurnstile(token: string, ip: string | null): Promise<boolean> {
-  if (!TURNSTILE_SECRET) return true; // skipped in dev / when not configured
-  if (!token) return false;
-  const body = new URLSearchParams({ secret: TURNSTILE_SECRET, response: token });
+async function verifyTurnstile(
+  secret: string,
+  token: string,
+  ip: string | null,
+): Promise<boolean> {
+  if (!secret || !token) return false;
+  const body = new URLSearchParams({ secret, response: token });
   if (ip) body.set("remoteip", ip);
   try {
     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {

@@ -547,13 +547,26 @@ end$$;
 do $$
 declare t text;
 begin
+  -- Drop any old trigger from the wider list first (idempotent).
   for t in
     select unnest(array[
       'blog_posts','case_studies','testimonials','faqs','pages',
-      'immigration_pathways','pricing_tiers','bulk_tiers','authors'
+      'immigration_pathways','pricing_tiers','bulk_tiers','authors','media'
     ])
   loop
     execute format('drop trigger if exists %1$s_enqueue_build on public.%1$s', t);
+  end loop;
+
+  -- Only attach to tables whose rows ARE the published output. Author and
+  -- media changes don't change the live site by themselves (referencing
+  -- posts already enqueue when they update), so leaving them out keeps the
+  -- Deploy button honest about "real" pending changes.
+  for t in
+    select unnest(array[
+      'blog_posts','case_studies','testimonials','faqs','pages',
+      'immigration_pathways','pricing_tiers','bulk_tiers'
+    ])
+  loop
     execute format('create trigger %1$s_enqueue_build after insert or update or delete on public.%1$s for each row execute function public.enqueue_build_job()', t);
   end loop;
 end$$;
@@ -623,7 +636,6 @@ values
     'SearchHub Digital',
     'searchhub.digital',
     jsonb_build_object(
-      'logo', '/brands/searchhub.svg',
       'primary', '#0ea5e9',
       'accent', '#a855f7',
       'tagline', 'AI search & SEO that compounds.'
@@ -636,7 +648,6 @@ values
     'Kingsbridge Immigration',
     'kingsbridgeimmigration.ca',
     jsonb_build_object(
-      'logo', '/brands/kingsbridge.svg',
       'primary', '#b91c1c',
       'accent', '#0f172a',
       'tagline', 'Canadian immigration done right.'
@@ -649,7 +660,6 @@ values
     'Vantage Printers',
     null,
     jsonb_build_object(
-      'logo', '/brands/vantage.png',
       'primary', '#1d4ed8',
       'accent', '#facc15',
       'tagline', 'Print, packaging, possibility.'
@@ -761,7 +771,11 @@ alter table public.sites
   add column if not exists cms_domain text,
   -- Allowed Origins for the public read API + submit-form endpoint.
   -- If empty, the platform-level ALLOWED_ORIGINS env var is used.
-  add column if not exists allowed_origins text[] not null default '{}';
+  add column if not exists allowed_origins text[] not null default '{}',
+  -- Per-site Cloudflare Turnstile. When BOTH are filled the form endpoint
+  -- requires + verifies the token; when either is empty captcha is skipped.
+  add column if not exists turnstile_site_key text,
+  add column if not exists turnstile_secret_key text;
 
 create unique index if not exists sites_cms_domain_idx
   on public.sites (lower(cms_domain))
@@ -823,7 +837,7 @@ values (
   'Clona',
   'clona.my',
   jsonb_build_object(
-    'logo', '/brands/clona.svg',
+    'logo', null,
     'primary', '#6366f1',
     'accent', '#06b6d4',
     'tagline', 'AI automation that actually ships.'

@@ -43,7 +43,8 @@ export default async function NewBlogPostPage({
         authors={authors ?? []}
         onSubmit={async (fd) => {
           "use server";
-          await createBlogPost(siteSlug, fd);
+          const result = await createBlogPost(siteSlug, fd);
+          return { redirectTo: `/${siteSlug}/blog/${result.id}?created=1` };
         }}
       />
     </div>

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LoginForm } from "./login-form";
 import { StudioMark } from "@/components/brand/studio-mark";
+import { SiteLogo } from "@/components/brand/site-logo";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { getWhitelabelSite } from "@/lib/host";
 
@@ -45,12 +46,13 @@ export default async function LoginPage({
     >
       <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-[var(--color-border)] bg-[var(--color-surface)] px-12 py-12 lg:flex">
         <div className="flex items-center gap-3">
-          {whitelabel?.brand?.logo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={whitelabel.brand.logo}
-              alt={brandName}
-              className="h-10 w-10 rounded-md object-cover ring-1 ring-[var(--color-border)]"
+          {whitelabel ? (
+            <SiteLogo
+              logoUrl={whitelabel.brand?.logo}
+              domain={whitelabel.primary_domain}
+              primary={whitelabel.brand?.primary}
+              size={40}
+              rounded="md"
             />
           ) : (
             <StudioMark size={36} />
@@ -110,12 +112,13 @@ export default async function LoginPage({
       <div className="flex items-center justify-center px-6 py-12 lg:px-12">
         <div className="w-full max-w-[380px]">
           <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            {whitelabel?.brand?.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={whitelabel.brand.logo}
-                alt={brandName}
-                className="h-9 w-9 rounded-md object-cover ring-1 ring-[var(--color-border)]"
+            {whitelabel ? (
+              <SiteLogo
+                logoUrl={whitelabel.brand?.logo}
+                domain={whitelabel.primary_domain}
+                primary={whitelabel.brand?.primary}
+                size={36}
+                rounded="md"
               />
             ) : (
               <StudioMark size={36} />
