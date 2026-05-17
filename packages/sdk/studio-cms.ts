@@ -59,14 +59,26 @@ export function createCmsClient(opts: CmsClientOptions) {
   const ttl = (opts.cacheSeconds ?? 0) * 1000;
 
   async function request<T>(path: string): Promise<T> {
-    const url = `${baseUrl}/api/v1/sites/${opts.site}${path}`;
+    // When the caller isn't using in-memory caching (typical for build-time
+    // fetches), we also bypass Vercel's edge cache by appending a
+    // timestamp and sending `cache: no-store`. Studio's public API treats
+    // any `?_=…` query string as a cache-bypass signal. Runtime callers
+    // that pass `cacheSeconds > 0` keep the edge cache and get the speed
+    // benefit.
+    const sep = path.includes("?") ? "&" : "?";
+    const url = ttl > 0
+      ? `${baseUrl}/api/v1/sites/${opts.site}${path}`
+      : `${baseUrl}/api/v1/sites/${opts.site}${path}${sep}_=${Date.now()}`;
     if (ttl > 0) {
       const hit = cache.get(url);
       if (hit && Date.now() - hit.at < ttl) return hit.value as T;
     }
     const headers: Record<string, string> = { Accept: "application/json" };
     if (opts.apiKey) headers["Authorization"] = `Bearer ${opts.apiKey}`;
-    const res = await fetchImpl(url, { headers });
+    const res = await fetchImpl(url, {
+      headers,
+      cache: ttl > 0 ? "default" : "no-store",
+    });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`[@studio/cms] ${res.status} ${url}: ${text || res.statusText}`);
