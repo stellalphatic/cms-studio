@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ siteSlug: s
     .select("*")
     .eq("site_id", site.id)
     .eq("is_published", true)
-    .order("min_quantity", { ascending: true });
+    .order("sort_order", { ascending: true });
 
   if (dbErr) return jsonResponse({ error: dbErr.message }, cors, { status: 500 });
   const url = new URL(req.url);
