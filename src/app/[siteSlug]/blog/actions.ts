@@ -7,6 +7,7 @@ import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { readingMinutes, slugify } from "@/lib/utils";
+import { withAction } from "@/lib/action-error";
 
 const blogSchema = z.object({
   title: z.string().min(1, "Title is required").max(200),
@@ -122,134 +123,141 @@ function parseFormData(formData: FormData): BlogInput {
 }
 
 export async function createBlogPost(siteSlug: string, formData: FormData) {
-  const { ctx, site } = await requireSiteAccess(siteSlug);
-  const input = parseFormData(formData);
-  const supabase = await createSupabaseServerClient();
+  return withAction("createBlogPost", async () => {
+    const { ctx, site } = await requireSiteAccess(siteSlug);
+    const input = parseFormData(formData);
+    const supabase = await createSupabaseServerClient();
 
-  if (!input.slug) input.slug = slugify(input.title);
-  if (input.status === "published" && !input.published_at) {
-    input.published_at = new Date().toISOString();
-  }
+    if (!input.slug) input.slug = slugify(input.title);
+    if (!input.slug) throw new Error("Title or slug is required");
+    if (input.status === "published" && !input.published_at) {
+      input.published_at = new Date().toISOString();
+    }
 
-  const authorId = await resolveAuthorId(
-    supabase,
-    site.id,
-    input.author_name,
-    input.author_avatar_url,
-  );
+    const authorId = await resolveAuthorId(
+      supabase,
+      site.id,
+      input.author_name,
+      input.author_avatar_url,
+    );
 
-  const { data, error } = await supabase
-    .from("blog_posts")
-    .insert({
+    const { data, error } = await supabase
+      .from("blog_posts")
+      .insert({
+        site_id: site.id,
+        title: input.title,
+        slug: input.slug,
+        excerpt: input.excerpt,
+        body_html: input.body_html,
+        cover_url: input.cover_url || null,
+        cover_alt: input.cover_alt,
+        author_id: authorId,
+        category: input.category,
+        tags: input.tags,
+        status: input.status,
+        published_at: input.published_at,
+        scheduled_for: input.scheduled_for,
+        read_minutes: readingMinutes(input.body_html),
+        seo: {
+          title: input.seo_title ?? undefined,
+          description: input.seo_description ?? undefined,
+        },
+        custom_fields: input.custom_fields,
+        created_by: ctx.user.id,
+        updated_by: ctx.user.id,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await logAudit({
       site_id: site.id,
-      title: input.title,
-      slug: input.slug,
-      excerpt: input.excerpt,
-      body_html: input.body_html,
-      cover_url: input.cover_url || null,
-      cover_alt: input.cover_alt,
-      author_id: authorId,
-      category: input.category,
-      tags: input.tags,
-      status: input.status,
-      published_at: input.published_at,
-      scheduled_for: input.scheduled_for,
-      read_minutes: readingMinutes(input.body_html),
-      seo: {
-        title: input.seo_title ?? undefined,
-        description: input.seo_description ?? undefined,
-      },
-      custom_fields: input.custom_fields,
-      created_by: ctx.user.id,
-      updated_by: ctx.user.id,
-    })
-    .select("id")
-    .single();
+      actor_id: ctx.user.id,
+      action: "create",
+      entity: "blog_posts",
+      entity_id: data.id,
+      diff: { title: input.title, status: input.status },
+    });
 
-  if (error) throw new Error(error.message);
-
-  await logAudit({
-    site_id: site.id,
-    actor_id: ctx.user.id,
-    action: "create",
-    entity: "blog_posts",
-    entity_id: data.id,
-    diff: { title: input.title, status: input.status },
+    revalidatePath(`/${siteSlug}/blog`);
+    redirect(`/${siteSlug}/blog/${data.id}?created=1`);
   });
-
-  revalidatePath(`/${siteSlug}/blog`);
-  redirect(`/${siteSlug}/blog/${data.id}?created=1`);
 }
 
 export async function updateBlogPost(siteSlug: string, id: string, formData: FormData) {
-  const { ctx, site } = await requireSiteAccess(siteSlug);
-  const input = parseFormData(formData);
-  const supabase = await createSupabaseServerClient();
+  return withAction("updateBlogPost", async () => {
+    const { ctx, site } = await requireSiteAccess(siteSlug);
+    const input = parseFormData(formData);
+    const supabase = await createSupabaseServerClient();
 
-  if (input.status === "published" && !input.published_at) {
-    input.published_at = new Date().toISOString();
-  }
+    if (input.status === "published" && !input.published_at) {
+      input.published_at = new Date().toISOString();
+    }
 
-  const authorId = await resolveAuthorId(
-    supabase,
-    site.id,
-    input.author_name,
-    input.author_avatar_url,
-  );
+    const authorId = await resolveAuthorId(
+      supabase,
+      site.id,
+      input.author_name,
+      input.author_avatar_url,
+    );
 
-  const { error } = await supabase
-    .from("blog_posts")
-    .update({
-      title: input.title,
-      slug: input.slug,
-      excerpt: input.excerpt,
-      body_html: input.body_html,
-      cover_url: input.cover_url || null,
-      cover_alt: input.cover_alt,
-      author_id: authorId,
-      category: input.category,
-      tags: input.tags,
-      status: input.status,
-      published_at: input.published_at,
-      scheduled_for: input.scheduled_for,
-      read_minutes: readingMinutes(input.body_html),
-      seo: {
-        title: input.seo_title ?? undefined,
-        description: input.seo_description ?? undefined,
-      },
-      custom_fields: input.custom_fields,
-      updated_by: ctx.user.id,
-    })
-    .eq("id", id)
-    .eq("site_id", site.id);
+    const { error } = await supabase
+      .from("blog_posts")
+      .update({
+        title: input.title,
+        slug: input.slug,
+        excerpt: input.excerpt,
+        body_html: input.body_html,
+        cover_url: input.cover_url || null,
+        cover_alt: input.cover_alt,
+        author_id: authorId,
+        category: input.category,
+        tags: input.tags,
+        status: input.status,
+        published_at: input.published_at,
+        scheduled_for: input.scheduled_for,
+        read_minutes: readingMinutes(input.body_html),
+        seo: {
+          title: input.seo_title ?? undefined,
+          description: input.seo_description ?? undefined,
+        },
+        custom_fields: input.custom_fields,
+        updated_by: ctx.user.id,
+      })
+      .eq("id", id)
+      .eq("site_id", site.id);
 
-  if (error) throw new Error(error.message);
+    if (error) throw new Error(error.message);
 
-  await logAudit({
-    site_id: site.id,
-    actor_id: ctx.user.id,
-    action: "update",
-    entity: "blog_posts",
-    entity_id: id,
-    diff: { title: input.title, status: input.status },
+    await logAudit({
+      site_id: site.id,
+      actor_id: ctx.user.id,
+      action: "update",
+      entity: "blog_posts",
+      entity_id: id,
+      diff: { title: input.title, status: input.status },
+    });
+
+    revalidatePath(`/${siteSlug}/blog`);
+    revalidatePath(`/${siteSlug}/blog/${id}`);
   });
-
-  revalidatePath(`/${siteSlug}/blog`);
-  revalidatePath(`/${siteSlug}/blog/${id}`);
 }
 
 export async function deleteBlogPost(siteSlug: string, id: string) {
-  const { ctx, site } = await requireSiteAccess(siteSlug);
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("blog_posts").delete().eq("id", id).eq("site_id", site.id);
-  if (error) throw new Error(error.message);
-  await logAudit({
-    site_id: site.id,
-    actor_id: ctx.user.id,
-    action: "delete",
-    entity: "blog_posts",
-    entity_id: id,
+  return withAction("deleteBlogPost", async () => {
+    const { ctx, site } = await requireSiteAccess(siteSlug);
+    const supabase = await createSupabaseServerClient();
+    const { error } = await supabase.from("blog_posts").delete().eq("id", id).eq("site_id", site.id);
+    if (error) throw new Error(error.message);
+    await logAudit({
+      site_id: site.id,
+      actor_id: ctx.user.id,
+      action: "delete",
+      entity: "blog_posts",
+      entity_id: id,
+    });
+    revalidatePath(`/${siteSlug}/blog`);
+    redirect(`/${siteSlug}/blog`);
   });
-  revalidatePath(`/${siteSlug}/blog`);
-  redirect(`/${siteSlug}/blog`);
 }

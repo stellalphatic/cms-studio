@@ -4,6 +4,7 @@ import { ArrowUpRight, ShieldCheck } from "lucide-react";
 import { requireUser } from "@/lib/auth";
 import { getWhitelabelSite } from "@/lib/host";
 import { StudioMark } from "@/components/brand/studio-mark";
+import { SiteLogo } from "@/components/brand/site-logo";
 import { Empty } from "@/components/ui/surface";
 
 export const metadata = { title: "Workspaces" };
@@ -80,12 +81,13 @@ export default async function WorkspacesPage() {
                   className="group flex items-center justify-between gap-6 px-6 py-5 transition hover:bg-[var(--color-surface-2)]"
                 >
                   <div className="flex min-w-0 items-center gap-5">
-                    <div
-                      className="grid h-12 w-12 shrink-0 place-items-center rounded-lg text-base font-semibold text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.15)]"
-                      style={{ background: m.site.brand?.primary ?? "oklch(0.55 0.2 275)" }}
-                    >
-                      {m.site.name.charAt(0)}
-                    </div>
+                    <SiteLogo
+                      logoUrl={m.site.brand?.logo}
+                      domain={m.site.primary_domain}
+                      primary={m.site.brand?.primary}
+                      size={48}
+                      rounded="lg"
+                    />
                     <div className="min-w-0">
                       <div
                         className="truncate text-[17px] font-semibold tracking-tight"

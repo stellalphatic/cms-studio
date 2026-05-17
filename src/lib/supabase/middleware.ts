@@ -73,6 +73,13 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+  // Public REST surface — auth (when present) is per-route via Bearer header.
+  // Never redirect these to /login: that breaks cross-origin browser POSTs
+  // from client sites (the browser sees a CORS-less redirect and reports
+  // "TypeError: Failed to fetch").
+  if (pathname.startsWith("/api/v1/") || pathname.startsWith("/api/public/")) {
+    return response;
+  }
   const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   if (!user && !isPublic) {

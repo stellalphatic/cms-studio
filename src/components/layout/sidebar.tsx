@@ -20,6 +20,7 @@ import {
 import { hasRole } from "@/lib/auth";
 import type { SiteSchema } from "@/lib/schemas";
 import type { Site, SiteRole } from "@/lib/supabase/types";
+import { SiteLogo } from "@/components/brand/site-logo";
 import { SidebarNav } from "./sidebar-nav";
 
 const ICONS = {
@@ -54,14 +55,6 @@ export function Sidebar({
   schema?: SiteSchema;
   role: SiteRole;
 }) {
-  const initials = site.name
-    .split(/\s+/)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-  const logo = site.brand?.logo;
-
   return (
     <aside className="sticky top-0 z-30 flex h-svh flex-col border-r border-[var(--color-border)] bg-[var(--color-surface)]">
       {/* Workspace identifier — clickable, opens the switcher in the topbar
@@ -71,21 +64,13 @@ export function Sidebar({
         className="group flex h-16 items-center gap-3 border-b border-[var(--color-border)] px-5 transition hover:bg-[var(--color-surface-2)]/60"
         title="Switch workspace"
       >
-        {logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={logo}
-            alt=""
-            className="h-9 w-9 shrink-0 rounded-md object-cover ring-1 ring-[var(--color-border)]"
-          />
-        ) : (
-          <div
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-md text-[11px] font-semibold tracking-wider text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.15)]"
-            style={{ background: site.brand?.primary ?? "oklch(0.55 0.2 275)" }}
-          >
-            {initials}
-          </div>
-        )}
+        <SiteLogo
+          logoUrl={site.brand?.logo}
+          domain={site.primary_domain}
+          primary={site.brand?.primary}
+          size={36}
+          rounded="md"
+        />
         <div className="min-w-0 flex-1">
           <div
             className="truncate text-[14px] font-semibold leading-tight tracking-tight"

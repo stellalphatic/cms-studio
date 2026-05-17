@@ -483,23 +483,64 @@ end$$;
 -- ============================================================================
 -- Build job dispatcher: when content rows change, enqueue a debounced job
 -- ============================================================================
+-- NOTE: this function runs against rows from many tables with different
+-- column shapes (status vs is_published vs neither). We use row_to_json
+-- so each branch picks the right "is this published?" signal without
+-- referencing a column that may not exist on the triggering table.
 create or replace function public.enqueue_build_job()
-returns trigger language plpgsql security definer set search_path = public as $$
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
 declare
   v_site uuid;
   v_debounce int;
+  v_should boolean := false;
+  v_new_status text;
+  v_old_status text;
+  v_new_pub boolean;
+  v_old_pub boolean;
 begin
-  v_site := coalesce(new.site_id, old.site_id);
+  v_site := coalesce(
+    (case when tg_op <> 'DELETE' then (row_to_json(new)->>'site_id')::uuid end),
+    (case when tg_op <> 'INSERT' then (row_to_json(old)->>'site_id')::uuid end)
+  );
+  if v_site is null then
+    return coalesce(new, old);
+  end if;
+
   select build_debounce_seconds into v_debounce from public.sites where id = v_site;
   v_debounce := coalesce(v_debounce, 30);
 
-  -- Only enqueue when status moves to/from published, OR a published row is edited
-  if (tg_op = 'INSERT' and new.status = 'published')
-     or (tg_op = 'UPDATE' and (old.status is distinct from new.status or new.status = 'published'))
-     or (tg_op = 'DELETE' and old.status = 'published') then
+  if tg_table_name in ('blog_posts','case_studies','pages','immigration_pathways','services') then
+    v_new_status := case when tg_op <> 'DELETE' then row_to_json(new)->>'status' end;
+    v_old_status := case when tg_op <> 'INSERT' then row_to_json(old)->>'status' end;
+    if (tg_op = 'INSERT' and v_new_status = 'published')
+       or (tg_op = 'UPDATE' and (v_old_status is distinct from v_new_status or v_new_status = 'published'))
+       or (tg_op = 'DELETE' and v_old_status = 'published') then
+      v_should := true;
+    end if;
+
+  elsif tg_table_name in ('testimonials','faqs','pricing_tiers','bulk_tiers') then
+    v_new_pub := case when tg_op <> 'DELETE' then (row_to_json(new)->>'is_published')::boolean end;
+    v_old_pub := case when tg_op <> 'INSERT' then (row_to_json(old)->>'is_published')::boolean end;
+    if (tg_op = 'INSERT' and v_new_pub)
+       or (tg_op = 'UPDATE' and (v_old_pub is distinct from v_new_pub or coalesce(v_new_pub, false)))
+       or (tg_op = 'DELETE' and v_old_pub) then
+      v_should := true;
+    end if;
+
+  else
+    -- authors / media / fallback: minor metadata changes always enqueue.
+    v_should := true;
+  end if;
+
+  if v_should then
     insert into public.build_jobs (site_id, trigger, scheduled_for)
     values (v_site, tg_table_name || ':' || tg_op, now() + (v_debounce || ' seconds')::interval);
   end if;
+
   return coalesce(new, old);
 end$$;
 
