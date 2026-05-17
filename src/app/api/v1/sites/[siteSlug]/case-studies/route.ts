@@ -34,5 +34,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ siteSlug: s
 
   const { data, error: dbErr } = await q;
   if (dbErr) return jsonResponse({ error: dbErr.message }, cors, { status: 500 });
-  return jsonResponse({ data, count: data?.length ?? 0 }, cors);
+  const noCache = url.searchParams.has("_") || url.searchParams.get("fresh") === "1";
+  return jsonResponse({ data, count: data?.length ?? 0 }, cors, { noCache });
 }

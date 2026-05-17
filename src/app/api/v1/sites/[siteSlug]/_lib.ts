@@ -67,14 +67,21 @@ export async function resolveSite(req: NextRequest, siteSlug: string) {
 export function jsonResponse<T>(
   data: T,
   cors: HeadersInit,
-  init?: { status?: number; cache?: number; staleWhileRevalidate?: number },
+  init?: { status?: number; cache?: number; staleWhileRevalidate?: number; noCache?: boolean },
 ) {
   const headers = new Headers(cors);
   headers.set("content-type", "application/json; charset=utf-8");
-  // Edge / CDN caching. Public read API — safe to cache.
-  const cache = init?.cache ?? 60; // 60s fresh
-  const swr = init?.staleWhileRevalidate ?? 3600; // 1h stale
-  headers.set("cache-control", `public, max-age=${cache}, s-maxage=${cache}, stale-while-revalidate=${swr}`);
+  if (init?.noCache) {
+    headers.set("cache-control", "no-store, no-cache, must-revalidate");
+  } else {
+    // Edge / CDN caching. Public read API — safe to cache.
+    const cache = init?.cache ?? 60; // 60s fresh
+    const swr = init?.staleWhileRevalidate ?? 3600; // 1h stale
+    headers.set(
+      "cache-control",
+      `public, max-age=${cache}, s-maxage=${cache}, stale-while-revalidate=${swr}`,
+    );
+  }
   headers.set("x-content-type-options", "nosniff");
   return new NextResponse(JSON.stringify(data), { status: init?.status ?? 200, headers });
 }

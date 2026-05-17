@@ -40,5 +40,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ siteSlug: s
   const { data, error: dbErr } = await q;
   if (dbErr) return jsonResponse({ error: dbErr.message }, cors, { status: 500 });
 
-  return jsonResponse({ data, count: data?.length ?? 0 }, cors);
+  // Build-script cache-buster (`?_=…`) or explicit `?fresh=1` skips the
+  // edge cache so a deploy fired right after publish gets fresh content.
+  const noCache = url.searchParams.has("_") || url.searchParams.get("fresh") === "1";
+  return jsonResponse({ data, count: data?.length ?? 0 }, cors, { noCache });
 }
