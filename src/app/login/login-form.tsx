@@ -187,7 +187,7 @@ export function LoginForm({
         </div>
 
         <Button
-          type="button"
+          type="submit"
           variant="secondary"
           size="lg"
           formAction={(fd) => start(() => magicLink(fd))}

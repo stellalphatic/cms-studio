@@ -39,11 +39,16 @@ try {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${serif.variable} ${mono.variable}`}>
+    <html
+      lang="en"
+      className={`${inter.variable} ${serif.variable} ${mono.variable}`}
+      data-theme="light"
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Toaster
           position="bottom-right"
