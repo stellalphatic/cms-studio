@@ -4,15 +4,21 @@ import {
   FileText,
   Inbox,
   Image as ImageIcon,
+  MonitorPlay,
   PenLine,
   Plus,
 } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { formatRelative } from "@/lib/utils";
-import { ContentStatusPill, SubmissionStatusPill } from "@/components/ui/status-pill";
+import {
+  ContentStatusPill,
+  SubmissionStatusPill,
+  WebinarPaymentPill,
+} from "@/components/ui/status-pill";
 import { Empty } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
+import type { WebinarPaymentStatus } from "@/lib/supabase/types";
 
 type SubmissionPayload = Record<string, string | undefined>;
 
@@ -24,6 +30,8 @@ export default async function DashboardPage({
   const { siteSlug } = await params;
   const { site } = await requireSiteAccess(siteSlug);
   const supabase = await createSupabaseServerClient();
+
+  const isKingsbridge = site.slug === "kingsbridge";
 
   const [
     { count: postCount },
@@ -65,10 +73,62 @@ export default async function DashboardPage({
       .limit(5),
   ]);
 
+  let webinarTotal = 0;
+  let webinarPaid = 0;
+  let webinarUnpaid = 0;
+  let recentWebinar: Array<{
+    id: string;
+    name: string;
+    email: string;
+    payment_status: WebinarPaymentStatus;
+    created_at: string;
+  }> = [];
+  let webinarTableMissing = false;
+
+  if (isKingsbridge) {
+    const [totalRes, paidRes, unpaidRes, recentRes] = await Promise.all([
+      supabase
+        .from("webinar_registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("site_id", site.id),
+      supabase
+        .from("webinar_registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("site_id", site.id)
+        .eq("payment_status", "paid"),
+      supabase
+        .from("webinar_registrations")
+        .select("id", { count: "exact", head: true })
+        .eq("site_id", site.id)
+        .eq("payment_status", "unpaid"),
+      supabase
+        .from("webinar_registrations")
+        .select("id, name, email, payment_status, created_at")
+        .eq("site_id", site.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
+
+    const missing =
+      Boolean(totalRes.error?.message?.includes("webinar_registrations")) ||
+      Boolean(totalRes.error?.code === "42P01") ||
+      Boolean(totalRes.error?.message?.toLowerCase().includes("schema cache"));
+
+    webinarTableMissing = missing;
+    webinarTotal = totalRes.count ?? 0;
+    webinarPaid = paidRes.count ?? 0;
+    webinarUnpaid = unpaidRes.count ?? 0;
+    recentWebinar = (recentRes.data ?? []) as typeof recentWebinar;
+  }
+
   const tagline = site.brand?.tagline;
   const inboxCount = newSubmissions ?? 0;
   const drafts = draftPosts ?? 0;
-  const focusItems = focusList({ inboxCount, drafts });
+  const focusItems = focusList({
+    inboxCount,
+    drafts,
+    webinarUnpaid: isKingsbridge ? webinarUnpaid : 0,
+  });
 
   return (
     <div className="space-y-12">
@@ -97,6 +157,19 @@ export default async function DashboardPage({
               Write a post
             </Button>
           </Link>
+          {isKingsbridge && (
+            <Link href={`/${site.slug}/webinar`}>
+              <Button size="md" variant="secondary">
+                <MonitorPlay className="h-4 w-4" />
+                Webinar
+                {webinarUnpaid > 0 && (
+                  <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[10.5px] font-semibold text-white tabular">
+                    {webinarUnpaid}
+                  </span>
+                )}
+              </Button>
+            </Link>
+          )}
           <Link href={`/${site.slug}/forms`}>
             <Button size="md" variant="secondary">
               Inbox
@@ -109,6 +182,44 @@ export default async function DashboardPage({
           </Link>
         </div>
       </header>
+
+      {isKingsbridge && webinarTableMissing && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-5 py-4 text-sm text-amber-950">
+          <strong>Webinar table not migrated yet.</strong> Run{" "}
+          <code className="font-mono text-[12px]">0009_webinar_registrations.sql</code> in the
+          Supabase SQL editor (or set <code className="font-mono text-[12px]">DATABASE_URL</code>{" "}
+          and use the apply script). Until then, Reserve on the live site cannot save seats.
+        </div>
+      )}
+
+      {isKingsbridge && !webinarTableMissing && (
+        <section>
+          <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.12em] text-[var(--color-fg-subtle)]">
+            Webinar ($1 seats)
+          </div>
+          <div className="grid gap-px overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-border)] sm:grid-cols-3">
+            <Stat
+              label="Registrations"
+              total={webinarTotal}
+              href={`/${site.slug}/webinar`}
+              icon={MonitorPlay}
+            />
+            <Stat
+              label="Paid"
+              total={webinarPaid}
+              href={`/${site.slug}/webinar?status=paid`}
+              icon={MonitorPlay}
+            />
+            <Stat
+              label="Unpaid"
+              total={webinarUnpaid}
+              sub="waiting on Stripe"
+              href={`/${site.slug}/webinar?status=unpaid`}
+              icon={MonitorPlay}
+            />
+          </div>
+        </section>
+      )}
 
       {/* What needs you — replaces the SaaS-cliché stat-quad with a directed
           to-do that drives clicks. */}
@@ -246,12 +357,65 @@ export default async function DashboardPage({
           )}
         </Panel>
       </section>
+
+      {isKingsbridge && !webinarTableMissing && (
+        <section>
+          <Panel
+            title="Latest webinar reservations"
+            eyebrow="Webinar"
+            action={{ href: `/${site.slug}/webinar`, label: "All registrants" }}
+          >
+            {recentWebinar.length ? (
+              <ul className="divide-y divide-[var(--color-border)]">
+                {recentWebinar.map((r) => (
+                  <li key={r.id} className="flex items-center justify-between gap-4 py-3">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/${site.slug}/webinar/${r.id}`}
+                        className="block truncate text-[13.5px] font-medium hover:underline underline-offset-4"
+                      >
+                        {r.name}
+                      </Link>
+                      <div className="mt-0.5 font-mono text-[10.5px] text-[var(--color-fg-subtle)]">
+                        {r.email} · {formatRelative(r.created_at)}
+                      </div>
+                    </div>
+                    <WebinarPaymentPill status={r.payment_status} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Empty
+                title="No webinar seats yet"
+                hint="When someone reserves on /webinar or /shabbeers-webinar, they appear here."
+                icon={MonitorPlay}
+              />
+            )}
+          </Panel>
+        </section>
+      )}
     </div>
   );
 }
 
-function focusList({ inboxCount, drafts }: { inboxCount: number; drafts: number }) {
+function focusList({
+  inboxCount,
+  drafts,
+  webinarUnpaid = 0,
+}: {
+  inboxCount: number;
+  drafts: number;
+  webinarUnpaid?: number;
+}) {
   const items: Array<{ count: number | string; label: string; hint: string; href: string }> = [];
+  if (webinarUnpaid > 0) {
+    items.push({
+      count: webinarUnpaid,
+      label: `Unpaid webinar seat${webinarUnpaid === 1 ? "" : "s"}`,
+      hint: "They reserved but have not completed the $1 Stripe payment yet.",
+      href: "/webinar?status=unpaid",
+    });
+  }
   if (inboxCount > 0) {
     items.push({
       count: inboxCount,

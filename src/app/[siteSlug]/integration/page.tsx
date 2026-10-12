@@ -90,6 +90,12 @@ ${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nNEXT_PUBLIC_T
     "turnstileToken": ""
   }'`;
 
+  const stripeWebhookUrl = `${studioUrl}/api/v1/webhooks/stripe`;
+  const stripeStudioEnv = `# Add these to the Studio (CMS) Vercel project — not the public site.
+WEBINAR_STRIPE_PAYMENT_LINK=https://buy.stripe.com/4gMdR9fu1a1XfrN6vB3Je09
+STRIPE_WEBHOOK_SECRET=whsec_...   # from Stripe → Developers → Webhooks → Signing secret
+`;
+
   return (
     <div className="max-w-4xl space-y-10">
       <PageHeader
@@ -196,6 +202,46 @@ ${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nNEXT_PUBLIC_T
           </div>
         </div>
       </Section>
+
+      {site.slug === "kingsbridge" && (
+        <Section title="Webinar $1 · Stripe">
+          <div className="space-y-4 text-[13px] leading-relaxed text-[var(--color-fg-muted)]">
+            <p>
+              Reserve on the public site creates an <b className="text-[var(--color-fg)]">unpaid</b>{" "}
+              row, then redirects to the Payment Link. Stripe calls this webhook to mark the seat{" "}
+              <b className="text-[var(--color-fg)]">paid</b>. View registrants under{" "}
+              <Link
+                href={`/${site.slug}/webinar`}
+                className="text-[var(--color-fg)] underline underline-offset-2"
+              >
+                Webinar
+              </Link>
+              .
+            </p>
+            <CopyBlock label="Stripe webhook endpoint URL" value={stripeWebhookUrl} />
+            <CopyBlock label="Studio Vercel env (CMS project only)" value={stripeStudioEnv} />
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>
+                Stripe Dashboard → Developers → Webhooks → Add endpoint → paste the URL above.
+              </li>
+              <li>
+                Events: <code className="font-mono text-[11px]">checkout.session.completed</code>,{" "}
+                <code className="font-mono text-[11px]">charge.refunded</code>.
+              </li>
+              <li>
+                Copy the signing secret into{" "}
+                <code className="font-mono text-[11px]">STRIPE_WEBHOOK_SECRET</code> on Vercel, then
+                redeploy Studio.
+              </li>
+              <li>
+                First-time DB setup: run{" "}
+                <code className="font-mono text-[11px]">supabase/migrations/0009_webinar_registrations.sql</code>{" "}
+                in the Supabase SQL editor (service-role keys cannot create tables).
+              </li>
+            </ul>
+          </div>
+        </Section>
+      )}
 
       {/* ── Deploy hooks ── */}
       <Section
