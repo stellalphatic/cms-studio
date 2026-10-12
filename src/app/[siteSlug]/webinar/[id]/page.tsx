@@ -11,6 +11,8 @@ import type { WebinarRegistration } from "@/lib/supabase/types";
 import { WebinarNotesEditor } from "./notes-editor";
 
 export const metadata = { title: "Webinar registration" };
+export const dynamic = "force-dynamic";
+
 
 export default async function WebinarRegistrationDetailPage({
   params,
@@ -154,6 +156,7 @@ export default async function WebinarRegistrationDetailPage({
         siteSlug={siteSlug}
         id={row.id}
         initialNotes={row.notes ?? ""}
+        paymentStatus={row.payment_status}
       />
     </div>
   );

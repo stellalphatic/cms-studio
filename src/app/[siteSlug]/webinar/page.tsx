@@ -12,6 +12,8 @@ import type { WebinarPaymentStatus, WebinarRegistration } from "@/lib/supabase/t
 import { WebinarFilterBar } from "./filter-bar";
 
 export const metadata = { title: "Webinar registrations" };
+export const dynamic = "force-dynamic";
+
 
 const PAYMENT_STATUSES: WebinarPaymentStatus[] = ["unpaid", "paid", "refunded"];
 

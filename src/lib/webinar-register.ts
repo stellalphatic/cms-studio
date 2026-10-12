@@ -122,6 +122,49 @@ export async function upsertUnpaidWebinarRegistration(args: {
   };
 }
 
+/**
+ * Resolve which unpaid (or any) registration a Stripe checkout belongs to.
+ * Prefer client_reference_id; fall back to the newest unpaid row for the
+ * payer email (covers Payment Links opened without the query param).
+ */
+export async function resolveWebinarRegistrationId(args: {
+  sb: AdminClient;
+  registrationId: string | null;
+  customerEmail: string | null;
+}): Promise<string | null> {
+  const explicit = (args.registrationId ?? "").trim();
+  if (explicit) {
+    const { data } = await args.sb
+      .from("webinar_registrations")
+      .select("id")
+      .eq("id", explicit)
+      .maybeSingle<{ id: string }>();
+    if (data?.id) return data.id;
+  }
+
+  const email = (args.customerEmail ?? "").trim().toLowerCase();
+  if (!email) return null;
+
+  const { data: unpaid } = await args.sb
+    .from("webinar_registrations")
+    .select("id")
+    .eq("email", email)
+    .eq("payment_status", "unpaid")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  if (unpaid?.id) return unpaid.id;
+
+  const { data: anyRow } = await args.sb
+    .from("webinar_registrations")
+    .select("id")
+    .eq("email", email)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+  return anyRow?.id ?? null;
+}
+
 /** Mark a registration paid from a verified Stripe checkout session. */
 export async function markWebinarRegistrationPaid(args: {
   sb: AdminClient;

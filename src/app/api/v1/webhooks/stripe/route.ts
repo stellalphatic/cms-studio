@@ -8,6 +8,7 @@ import {
 import {
   markWebinarRegistrationPaid,
   markWebinarRegistrationRefunded,
+  resolveWebinarRegistrationId,
 } from "@/lib/webinar-register";
 
 export const dynamic = "force-dynamic";
@@ -48,11 +49,23 @@ export async function POST(req: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object;
-    const registrationId = (session.client_reference_id ?? "").trim();
+    const customerEmail =
+      session.customer_details?.email ?? session.customer_email ?? null;
+    const explicitId = (session.client_reference_id ?? "").trim() || null;
+    const registrationId = await resolveWebinarRegistrationId({
+      sb,
+      registrationId: explicitId,
+      customerEmail,
+    });
+
     if (!registrationId) {
-      // Not a webinar payment (or misconfigured link) — acknowledge so Stripe
-      // does not retry forever.
-      return NextResponse.json({ ok: true, ignored: "missing_client_reference_id" });
+      // Not a webinar payment we can attach — acknowledge so Stripe stops retrying.
+      return NextResponse.json({
+        ok: true,
+        ignored: "registration_unresolved",
+        client_reference_id: explicitId,
+        customer_email: customerEmail,
+      });
     }
 
     const result = await markWebinarRegistrationPaid({
@@ -60,8 +73,7 @@ export async function POST(req: NextRequest) {
       registrationId,
       checkoutSessionId: session.id,
       paymentIntentId: paymentIntentId(session),
-      customerEmail:
-        session.customer_details?.email ?? session.customer_email ?? null,
+      customerEmail,
       amountCents: session.amount_total ?? null,
       currency: session.currency ?? null,
     });
@@ -78,6 +90,10 @@ export async function POST(req: NextRequest) {
       ok: true,
       registration_id: registrationId,
       already: Boolean(result.already),
+      matched_by:
+        explicitId && explicitId === registrationId
+          ? "client_reference_id"
+          : "email",
     });
   }
 
