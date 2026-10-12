@@ -11,6 +11,7 @@ import {
   Layers,
   Layout as LayoutIcon,
   LayoutDashboard,
+  MonitorPlay,
   Plug,
   Quote,
   Route,
@@ -89,6 +90,13 @@ export function Sidebar({
         <Section label="Overview">
           <SidebarNav href={`/${site.slug}`} icon={<LayoutDashboard />} label="Dashboard" exact />
           <SidebarNav href={`/${site.slug}/forms`} icon={<Inbox />} label="Submissions" />
+          {site.slug === "kingsbridge" && (
+            <SidebarNav
+              href={`/${site.slug}/webinar`}
+              icon={<MonitorPlay />}
+              label="Webinar"
+            />
+          )}
         </Section>
 
         <Section label="Content">

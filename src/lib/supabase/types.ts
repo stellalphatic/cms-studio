@@ -14,6 +14,8 @@ export type SubmissionStatus =
   | "closed"
   | "spam";
 
+export type WebinarPaymentStatus = "unpaid" | "paid" | "refunded";
+
 export interface Site {
   id: string;
   slug: string;
@@ -163,6 +165,30 @@ export interface FormSubmission {
   source_url: string | null;
   ip_address: string | null;
   user_agent: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebinarRegistration {
+  id: string;
+  site_id: string;
+  form_submission_id: string | null;
+  name: string;
+  email: string;
+  whatsapp: string;
+  source: string | null;
+  landing_variant: string | null;
+  payment_status: WebinarPaymentStatus;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_customer_email: string | null;
+  amount_cents: number | null;
+  currency: string | null;
+  paid_at: string | null;
+  source_url: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

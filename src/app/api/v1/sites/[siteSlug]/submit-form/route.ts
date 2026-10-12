@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Site } from "@/lib/supabase/types";
+import { upsertUnpaidWebinarRegistration } from "@/lib/webinar-register";
 
 /**
  * Public form-submission endpoint, on the CMS URL.
@@ -139,6 +140,33 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
     return json({ error: insertErr?.message ?? "insert_failed" }, 500, cors);
   }
 
+  // Kingsbridge webinar: also create an unpaid seat row and return the Stripe
+  // Payment Link so the public site can redirect the registrant to pay $1.
+  let webinarExtra: Record<string, unknown> | null = null;
+  if (formName === "webinar_registration") {
+    const webinar = await upsertUnpaidWebinarRegistration({
+      sb,
+      siteId: site.id,
+      formSubmissionId: row.id,
+      payload: sanitised,
+      sourceUrl: req.headers.get("referer") ?? null,
+      ip,
+      userAgent: ua,
+    });
+    if (!webinar.ok) {
+      // Roll back the inbox row so we don't leave unpaid form noise without a seat.
+      await sb.from("form_submissions").delete().eq("id", row.id);
+      return json({ error: webinar.error }, webinar.status, cors);
+    }
+    webinarExtra = {
+      registration_id: webinar.registration_id,
+      payment_status: webinar.payment_status,
+      payment_url: webinar.payment_url,
+    };
+    sanitised.registration_id = webinar.registration_id;
+    sanitised.payment_status = webinar.payment_status;
+  }
+
   // Fire-and-forget email. Per-site Resend overrides platform default.
   const resendKey = site.resend_api_key ?? process.env.RESEND_API_KEY ?? "";
   const resendFrom = site.resend_from_email ?? process.env.RESEND_FROM_EMAIL ?? "";
@@ -161,13 +189,16 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
       apiKey: resendKey,
       from: resendFrom,
       to: notifyList,
-      subject: `New ${formName} submission · ${site.slug}`,
+      subject:
+        formName === "webinar_registration"
+          ? `New webinar reservation (unpaid) · ${site.slug}`
+          : `New ${formName} submission · ${site.slug}`,
       payload: sanitised,
       origin: req.headers.get("origin") ?? site.slug,
     });
   }
 
-  return json({ ok: true, id: row.id }, 201, cors);
+  return json({ ok: true, id: row.id, ...(webinarExtra ?? {}) }, 201, cors);
 }
 
 /**

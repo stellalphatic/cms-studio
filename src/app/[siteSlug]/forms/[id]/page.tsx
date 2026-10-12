@@ -4,9 +4,14 @@ import { ArrowLeft } from "lucide-react";
 import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/ui/page-header";
-import { SubmissionStatusPill } from "@/components/ui/status-pill";
+import { SubmissionStatusPill, WebinarPaymentPill } from "@/components/ui/status-pill";
 import { formatDate } from "@/lib/utils";
-import type { FormSubmission, Profile } from "@/lib/supabase/types";
+import type {
+  FormSubmission,
+  Profile,
+  WebinarPaymentStatus,
+  WebinarRegistration,
+} from "@/lib/supabase/types";
 import { SubmissionEditor } from "./submission-editor";
 
 export const metadata = { title: "Submission" };
@@ -41,6 +46,29 @@ export default async function SubmissionDetailPage({
 
   const payload = (row.payload ?? {}) as Record<string, string>;
 
+  let webinar: Pick<
+    WebinarRegistration,
+    "id" | "payment_status" | "paid_at" | "stripe_checkout_session_id"
+  > | null = null;
+  if (row.form_name === "webinar_registration") {
+    const registrationId = payload.registration_id;
+    let wq = supabase
+      .from("webinar_registrations")
+      .select("id, payment_status, paid_at, stripe_checkout_session_id")
+      .eq("site_id", site.id)
+      .limit(1);
+    wq = registrationId
+      ? wq.eq("id", registrationId)
+      : wq.eq("form_submission_id", row.id);
+    const { data: w } = await wq.maybeSingle<
+      Pick<
+        WebinarRegistration,
+        "id" | "payment_status" | "paid_at" | "stripe_checkout_session_id"
+      >
+    >();
+    webinar = w;
+  }
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
       <div>
@@ -53,7 +81,16 @@ export default async function SubmissionDetailPage({
         <PageHeader
           title={payload.name ?? payload.full_name ?? payload.email ?? row.form_name}
           description={`${row.form_name} · ${formatDate(row.created_at, { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`}
-          action={<SubmissionStatusPill status={row.status} />}
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <SubmissionStatusPill status={row.status} />
+              {webinar && (
+                <WebinarPaymentPill
+                  status={webinar.payment_status as WebinarPaymentStatus}
+                />
+              )}
+            </div>
+          }
         />
         <div className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
           <dl className="grid gap-y-3 gap-x-6 text-sm sm:grid-cols-[140px_1fr]">
@@ -62,6 +99,13 @@ export default async function SubmissionDetailPage({
                 {String(v)}
               </FieldRow>
             ))}
+            {webinar && (
+              <FieldRow label="Webinar record">
+                <Link className="underline" href={`/${siteSlug}/webinar/${webinar.id}`}>
+                  Open webinar registration
+                </Link>
+              </FieldRow>
+            )}
             {row.source_url && (
               <FieldRow label="Source URL">
                 <a className="underline" href={row.source_url} target="_blank" rel="noreferrer">

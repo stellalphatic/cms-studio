@@ -1,5 +1,9 @@
 import { cn } from "@/lib/utils";
-import type { ContentStatus, SubmissionStatus } from "@/lib/supabase/types";
+import type {
+  ContentStatus,
+  SubmissionStatus,
+  WebinarPaymentStatus,
+} from "@/lib/supabase/types";
 
 type Tone = "draft" | "info" | "publish" | "warn" | "bad";
 
@@ -58,6 +62,20 @@ export function SubmissionStatusPill({ status }: { status: SubmissionStatus }) {
   return (
     <Pill tone={submissionTone[status]} dot={status === "new"}>
       <span className="capitalize">{status.replace("_", " ")}</span>
+    </Pill>
+  );
+}
+
+const webinarTone: Record<WebinarPaymentStatus, Tone> = {
+  unpaid: "warn",
+  paid: "publish",
+  refunded: "bad",
+};
+
+export function WebinarPaymentPill({ status }: { status: WebinarPaymentStatus }) {
+  return (
+    <Pill tone={webinarTone[status]} dot={status === "unpaid"}>
+      <span className="capitalize">{status}</span>
     </Pill>
   );
 }

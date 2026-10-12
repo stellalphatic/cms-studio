@@ -58,6 +58,7 @@ export function FilterBar({
         <option value="contact">Contact</option>
         <option value="audit">Audit</option>
         <option value="consultation">Consultation</option>
+        <option value="webinar_registration">Webinar registration</option>
       </Select>
     </div>
   );

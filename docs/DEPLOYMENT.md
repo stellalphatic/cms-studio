@@ -78,3 +78,17 @@ When you add a new site that needs a unique table (like Kingsbridge's
 4. Run the migration on Supabase, redeploy Studio.
 
 That's the entire onboarding loop for novel content shapes.
+
+## Kingsbridge webinar ($1 seat) + Stripe
+
+1. Run `supabase/migrations/0009_webinar_registrations.sql` on Supabase.
+2. Set Studio env vars:
+   - `WEBINAR_STRIPE_PAYMENT_LINK=https://buy.stripe.com/4gMdR9fu1a1XfrN6vB3Je09`
+   - `STRIPE_WEBHOOK_SECRET=whsec_...` (from Stripe Dashboard)
+3. Stripe Dashboard → Developers → Webhooks → Add endpoint:
+   - URL: `https://<cms-host>/api/v1/webhooks/stripe`
+   - Events: `checkout.session.completed`, `charge.refunded`
+4. Redeploy Studio. Public site Reserve → unpaid row → redirect to Payment
+   Link with `client_reference_id` → webhook marks paid.
+5. CMS → Kingsbridge → **Webinar** inbox (also visible under Submissions
+   filtered to `webinar_registration`).

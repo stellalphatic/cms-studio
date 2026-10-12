@@ -4,12 +4,15 @@ import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { SubmissionStatusPill } from "@/components/ui/status-pill";
+import { SubmissionStatusPill, WebinarPaymentPill } from "@/components/ui/status-pill";
 import { DataTable, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Empty } from "@/components/ui/surface";
-import { cn } from "@/lib/utils";
-import { formatRelative } from "@/lib/utils";
-import type { FormSubmission, SubmissionStatus } from "@/lib/supabase/types";
+import { cn, formatRelative } from "@/lib/utils";
+import type {
+  FormSubmission,
+  SubmissionStatus,
+  WebinarPaymentStatus,
+} from "@/lib/supabase/types";
 import { FilterBar } from "./filter-bar";
 
 export const metadata = { title: "Submissions" };
@@ -67,7 +70,7 @@ export default async function FormsPage({
     <div>
       <PageHeader
         title="Submissions"
-        description="Every contact, audit, and consultation request lands here in real time."
+        description="Every contact, consultation, and webinar reservation lands here in real time."
         action={
           <a
             href={`/${siteSlug}/forms/export?${new URLSearchParams(sp as Record<string, string>).toString()}`}
@@ -114,6 +117,7 @@ export default async function FormsPage({
               const payload = (s.payload ?? {}) as Record<string, string>;
               const name = payload.name ?? payload.full_name ?? payload.fullName ?? payload.email ?? "—";
               const email = payload.email ?? "";
+              const paymentStatus = payload.payment_status as WebinarPaymentStatus | undefined;
               return (
                 <TR key={s.id}>
                   <TD>
@@ -133,7 +137,15 @@ export default async function FormsPage({
                     {s.form_name}
                   </TD>
                   <TD>
-                    <SubmissionStatusPill status={s.status} />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <SubmissionStatusPill status={s.status} />
+                      {paymentStatus &&
+                        (paymentStatus === "unpaid" ||
+                          paymentStatus === "paid" ||
+                          paymentStatus === "refunded") && (
+                          <WebinarPaymentPill status={paymentStatus} />
+                        )}
+                    </div>
                   </TD>
                   <TD muted align="right" mono>
                     {formatRelative(s.created_at)}
