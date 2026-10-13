@@ -216,6 +216,30 @@ export async function processDueUnpaidReminders(
   limit = 40,
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   const nowIso = new Date().toISOString();
+
+  // Heal older rows where schedule never wrote due_at (stayed pending forever).
+  const { data: orphans } = await sb
+    .from("webinar_registrations")
+    .select("id, created_at, site_id")
+    .eq("payment_status", "unpaid")
+    .eq("unpaid_reminder_status", "pending")
+    .is("unpaid_reminder_due_at", null)
+    .limit(100);
+
+  for (const orphan of orphans ?? []) {
+    const site = await loadSiteMail(sb, orphan.site_id);
+    const cfg = resolveWebinarMailConfig(site);
+    const created = new Date(orphan.created_at).getTime();
+    const due = new Date(
+      created + cfg.unpaidReminderMinutes * 60_000,
+    ).toISOString();
+    await sb
+      .from("webinar_registrations")
+      .update({ unpaid_reminder_due_at: due })
+      .eq("id", orphan.id)
+      .is("unpaid_reminder_due_at", null);
+  }
+
   const { data: due } = await sb
     .from("webinar_registrations")
     .select(

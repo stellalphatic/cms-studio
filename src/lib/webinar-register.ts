@@ -119,13 +119,16 @@ export async function upsertUnpaidWebinarRegistration(args: {
     .update({ payload: enrichedPayload })
     .eq("id", args.formSubmissionId);
 
-  // Schedule unpaid payment reminder (+ Brevo Leads sync). Fire-and-forget.
-  void onWebinarUnpaidCreated({
-    sb: args.sb,
-    registrationId,
-  }).catch((err) => {
+  // Must await schedule so unpaid_reminder_due_at is set before response
+  // (cron ignores rows with null due_at). Brevo contact sync is inside.
+  try {
+    await onWebinarUnpaidCreated({
+      sb: args.sb,
+      registrationId,
+    });
+  } catch (err) {
     console.error("[webinar-emails] unpaid schedule failed", registrationId, err);
-  });
+  }
 
   return {
     ok: true,

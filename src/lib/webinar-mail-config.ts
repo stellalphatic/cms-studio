@@ -10,7 +10,7 @@ export const DEFAULT_WEBINAR_ZOOM_URL =
   "https://us06web.zoom.us/j/81115328974?pwd=iws54ne0SHl0uRBSky9siDsQe60L29.1";
 export const DEFAULT_WEBINAR_ZOOM_MEETING_ID = "811 1532 8974";
 export const DEFAULT_WEBINAR_ZOOM_PASSCODE = "532418";
-export const DEFAULT_UNPAID_REMINDER_MINUTES = 15;
+export const DEFAULT_UNPAID_REMINDER_MINUTES = 5;
 
 export type SiteBrevoMailConfig = {
   brevo_api_key: string | null;

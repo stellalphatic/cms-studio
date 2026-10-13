@@ -75,7 +75,7 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
     webinar_zoom_passcode:
       String(formData.get("webinar_zoom_passcode") ?? "") || null,
     webinar_unpaid_reminder_minutes: Number(
-      formData.get("webinar_unpaid_reminder_minutes") ?? 15,
+      formData.get("webinar_unpaid_reminder_minutes") ?? 5,
     ),
   });
 
@@ -120,7 +120,7 @@ export async function updateSiteSettings(siteSlug: string, formData: FormData) {
       webinar_zoom_meeting_id: input.webinar_zoom_meeting_id,
       webinar_zoom_passcode: input.webinar_zoom_passcode,
       webinar_unpaid_reminder_minutes:
-        input.webinar_unpaid_reminder_minutes ?? 15,
+        input.webinar_unpaid_reminder_minutes ?? 5,
     })
     .eq("id", site.id);
   if (error) throw new Error(error.message);

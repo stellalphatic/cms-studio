@@ -397,7 +397,7 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
               name="webinar_unpaid_reminder_minutes"
               type="number"
               min={1}
-              defaultValue={site.webinar_unpaid_reminder_minutes ?? 15}
+              defaultValue={site.webinar_unpaid_reminder_minutes ?? 5}
               disabled={!canEdit}
               className="font-mono text-[12px] max-w-[120px]"
             />
