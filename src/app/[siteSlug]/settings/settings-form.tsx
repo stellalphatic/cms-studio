@@ -257,7 +257,7 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
 
       <SettingSection
         title="Brevo · client email"
-        description="Per-site Brevo mail for webinar leads. Prefer the REST API key (xkeysib-…). SMTP login/key is a fallback. Leave blank to use platform env."
+        description="Per-site Brevo mail for webinar leads. Use the REST API key (xkeysib-…). If Brevo shows “unrecognised IP”, open Security → Authorised IPs and turn off IP restriction (Vercel serverless IPs change; do not whitelist a single IP)."
       >
         <Field label="Brevo API key" hint="app.brevo.com → Settings → API Keys">
           <Input
