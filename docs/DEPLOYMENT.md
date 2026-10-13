@@ -93,17 +93,19 @@ That's the entire onboarding loop for novel content shapes.
 5. CMS → Kingsbridge → **Webinar** inbox (also visible under Submissions
    filtered to `webinar_registration`).
 
-## Kingsbridge Meta CAPI (Lead + Purchase)
+## Kingsbridge Meta (Lead browser + Purchase CAPI)
 
-Pixel `1000856715673214` stays installed on the public site only. CMS sends:
+Pixel `1000856715673214` stays on the public site only (do not reinstall).
 
-- **Lead** after a Kingsbridge form row is saved (`submit-form`)
-- **Purchase** when Stripe marks a webinar seat paid (`checkout.session.completed`)
+- **Lead** — browser Pixel, only after CMS `submit-form` returns 2xx (not on button click).
+- **Purchase** — CMS Conversions API when Stripe marks a webinar seat paid.
 
-Studio env:
+Studio env (Purchase CAPI):
 
 - `META_PIXEL_ID=1000856715673214`
 - `META_CAPI_ACCESS_TOKEN=...` (Events Manager → Pixel → Settings → Generate access token)
-- Optional QA only: `META_TEST_EVENT_CODE=TESTxxxx` then remove after Test Events pass
+- Optional QA: `META_TEST_EVENT_CODE=TESTxxxx` then remove after Test Events pass
 
-Smoke test: `npx tsx scripts/test-meta-capi.ts`
+Public site QA: open `/?meta_test_code=TESTxxxx` or set `VITE_META_TEST_EVENT_CODE` and redeploy, then remove.
+
+Smoke: `npx tsx scripts/test-meta-capi.ts` · `npx tsx scripts/test-stripe-paid-capi.ts`

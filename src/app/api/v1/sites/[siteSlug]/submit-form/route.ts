@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Site } from "@/lib/supabase/types";
-import { voidMetaCapiEvent } from "@/lib/meta-capi";
 import { upsertUnpaidWebinarRegistration } from "@/lib/webinar-register";
 
 /**
@@ -205,35 +204,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
     });
   }
 
-  // Kingsbridge: Meta CAPI Lead after the CMS row is committed (Pixel stays client-side).
-  if (site.slug === "kingsbridge") {
-    const leadEventId =
-      (typeof body.meta?.event_id === "string" && body.meta.event_id.trim()) ||
-      `lead_${row.id}`;
-    const email = String(sanitised.email ?? "").trim() || null;
-    const phone =
-      String(sanitised.whatsapp ?? sanitised.phone ?? "").trim() || null;
-    const name = String(sanitised.name ?? "").trim() || null;
-    voidMetaCapiEvent({
-      eventName: "Lead",
-      eventId: leadEventId,
-      eventSourceUrl: req.headers.get("referer") ?? req.headers.get("origin"),
-      email,
-      phone,
-      name,
-      ip,
-      userAgent: ua,
-      fbp: body.meta?.fbp ?? null,
-      fbc: body.meta?.fbc ?? null,
-      externalId: row.id,
-      customData: {
-        content_name: formName,
-        content_category: formName === "webinar_registration" ? "webinar" : "lead",
-        content_ids: [row.id],
-      },
-    });
-  }
-
+  // Lead is fired by the public-site browser Pixel ONLY after this 201
+  // (shared event_id). CAPI Lead is intentionally not sent here so Test Events
+  // shows exactly one Lead per successful save. Purchase remains CAPI (Stripe).
   return json(
     {
       ok: true,
