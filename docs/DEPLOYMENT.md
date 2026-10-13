@@ -109,3 +109,15 @@ Studio env (Purchase CAPI):
 Public site QA: open `/?meta_test_code=TESTxxxx` or set `VITE_META_TEST_EVENT_CODE` and redeploy, then remove.
 
 Smoke: `npx tsx scripts/test-meta-capi.ts` · `npx tsx scripts/test-stripe-paid-capi.ts`
+
+## Kingsbridge webinar emails (Brevo)
+
+1. Run `0010_webinar_emails_and_brevo.sql` on Supabase.
+2. Prefer **CMS → Kingsbridge → Settings → Brevo** (per-site keys), not only root env:
+   - `brevo_api_key` (**required**, `xkeysib-…` from Brevo → Settings → API Keys)
+   - From email/name (domain must be verified in Brevo)
+   - Optional Leads / Registered list IDs
+   - Webinar date, Zoom URL/ID/passcode, unpaid reminder minutes (default 15)
+3. Platform fallbacks (optional): `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `CRON_SECRET`, etc. See `.env.example`.
+4. Vercel Cron hits `/api/v1/cron/webinar-emails` every minute (set `CRON_SECRET`).
+5. Flow: unpaid lead → schedule reminder → after N minutes if still unpaid → payment email; Stripe paid → Zoom confirmation once. Email status columns show sent/failed/skipped.

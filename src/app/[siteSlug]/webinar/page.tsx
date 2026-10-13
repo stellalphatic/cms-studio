@@ -32,7 +32,7 @@ export default async function WebinarRegistrationsPage({
   let q = supabase
     .from("webinar_registrations")
     .select(
-      "id, name, email, whatsapp, source, landing_variant, payment_status, amount_cents, currency, paid_at, created_at, stripe_checkout_session_id",
+      "id, name, email, whatsapp, source, landing_variant, payment_status, amount_cents, currency, paid_at, created_at, stripe_checkout_session_id, unpaid_reminder_status, paid_confirmation_status",
     )
     .eq("site_id", site.id)
     .order("created_at", { ascending: false })
@@ -56,6 +56,8 @@ export default async function WebinarRegistrationsPage({
     | "paid_at"
     | "created_at"
     | "stripe_checkout_session_id"
+    | "unpaid_reminder_status"
+    | "paid_confirmation_status"
   >[];
 
   if (sp.q) {
@@ -143,6 +145,7 @@ export default async function WebinarRegistrationsPage({
               <TH>WhatsApp</TH>
               <TH>Variant</TH>
               <TH>Payment</TH>
+              <TH>Emails</TH>
               <TH align="right">Reserved</TH>
             </TR>
           </THead>
@@ -172,6 +175,22 @@ export default async function WebinarRegistrationsPage({
                       {(r.currency ?? "cad").toUpperCase()}
                     </div>
                   )}
+                </TD>
+                <TD muted>
+                  <div className="text-[11px] leading-5">
+                    <div>
+                      Pay reminder:{" "}
+                      <span className="font-medium text-[var(--color-fg)]">
+                        {r.unpaid_reminder_status ?? "—"}
+                      </span>
+                    </div>
+                    <div>
+                      Zoom confirm:{" "}
+                      <span className="font-medium text-[var(--color-fg)]">
+                        {r.paid_confirmation_status ?? "—"}
+                      </span>
+                    </div>
+                  </div>
                 </TD>
                 <TD align="right" muted mono>
                   {formatRelative(r.created_at)}

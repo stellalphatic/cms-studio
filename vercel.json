@@ -2,6 +2,12 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/v1/cron/webinar-emails",
+      "schedule": "* * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/api/v1/:path*",

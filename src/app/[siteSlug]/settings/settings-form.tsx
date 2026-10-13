@@ -255,6 +255,156 @@ export function SettingsForm({ site, canEdit }: { site: Site; canEdit: boolean }
         </Field>
       </SettingSection>
 
+      <SettingSection
+        title="Brevo · client email"
+        description="Per-site Brevo mail for webinar leads. Prefer the REST API key (xkeysib-…). SMTP login/key is a fallback. Leave blank to use platform env."
+      >
+        <Field label="Brevo API key" hint="app.brevo.com → Settings → API Keys">
+          <Input
+            name="brevo_api_key"
+            defaultValue={site.brevo_api_key ?? ""}
+            disabled={!canEdit}
+            placeholder="xkeysib-…"
+            type="password"
+            className="font-mono text-[12px]"
+            autoComplete="off"
+          />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="SMTP login" hint="Optional fallback">
+            <Input
+              name="brevo_smtp_login"
+              defaultValue={site.brevo_smtp_login ?? ""}
+              disabled={!canEdit}
+              placeholder="…@smtp-brevo.com"
+              className="font-mono text-[12px]"
+              autoComplete="off"
+            />
+          </Field>
+          <Field label="SMTP key" hint="xsmtpsib-…">
+            <Input
+              name="brevo_smtp_key"
+              defaultValue={site.brevo_smtp_key ?? ""}
+              disabled={!canEdit}
+              placeholder="xsmtpsib-…"
+              type="password"
+              className="font-mono text-[12px]"
+              autoComplete="off"
+            />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="From email" hint="Verified sender on Brevo domain">
+            <Input
+              name="brevo_from_email"
+              defaultValue={site.brevo_from_email ?? ""}
+              disabled={!canEdit}
+              placeholder="noreply@kingsbridgeimmigration.ca"
+            />
+          </Field>
+          <Field label="From name">
+            <Input
+              name="brevo_from_name"
+              defaultValue={site.brevo_from_name ?? ""}
+              disabled={!canEdit}
+              placeholder="Kingsbridge Immigration"
+            />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Leads list ID" hint="Brevo list for unpaid leads">
+            <Input
+              name="brevo_leads_list_id"
+              defaultValue={site.brevo_leads_list_id ?? ""}
+              disabled={!canEdit}
+              placeholder="2"
+              className="font-mono text-[12px]"
+            />
+          </Field>
+          <Field label="Registered list ID" hint="Brevo list after paid">
+            <Input
+              name="brevo_registered_list_id"
+              defaultValue={site.brevo_registered_list_id ?? ""}
+              disabled={!canEdit}
+              placeholder="3"
+              className="font-mono text-[12px]"
+            />
+          </Field>
+        </div>
+      </SettingSection>
+
+      {site.slug === "kingsbridge" && (
+        <SettingSection
+          title="Webinar email content"
+          description="Date, Zoom, and unpaid reminder delay used in client emails. Confirm with the host before go-live."
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Webinar date label">
+              <Input
+                name="webinar_date_label"
+                defaultValue={site.webinar_date_label ?? "October 21, 2026"}
+                disabled={!canEdit}
+              />
+            </Field>
+            <Field label="Local time label">
+              <Input
+                name="webinar_local_time_label"
+                defaultValue={
+                  site.webinar_local_time_label ?? "12:30 PM America/Toronto"
+                }
+                disabled={!canEdit}
+              />
+            </Field>
+          </div>
+          <Field label="Timezone (IANA)">
+            <Input
+              name="webinar_timezone"
+              defaultValue={site.webinar_timezone ?? "America/Toronto"}
+              disabled={!canEdit}
+              className="font-mono text-[12px]"
+            />
+          </Field>
+          <Field label="Zoom join URL">
+            <Input
+              name="webinar_zoom_url"
+              defaultValue={site.webinar_zoom_url ?? ""}
+              disabled={!canEdit}
+              placeholder="https://us06web.zoom.us/j/…"
+              className="font-mono text-[12px]"
+            />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Zoom meeting ID">
+              <Input
+                name="webinar_zoom_meeting_id"
+                defaultValue={site.webinar_zoom_meeting_id ?? ""}
+                disabled={!canEdit}
+              />
+            </Field>
+            <Field label="Zoom passcode">
+              <Input
+                name="webinar_zoom_passcode"
+                defaultValue={site.webinar_zoom_passcode ?? ""}
+                disabled={!canEdit}
+              />
+            </Field>
+          </div>
+          <Field
+            label="Unpaid reminder delay (minutes)"
+            hint="Send payment email only if still unpaid after this delay."
+          >
+            <Input
+              name="webinar_unpaid_reminder_minutes"
+              type="number"
+              min={1}
+              defaultValue={site.webinar_unpaid_reminder_minutes ?? 15}
+              disabled={!canEdit}
+              className="font-mono text-[12px] max-w-[120px]"
+            />
+          </Field>
+        </SettingSection>
+      )}
+
       {canEdit && (
         <div className="sticky bottom-4 z-10 flex justify-end">
           <div className="rounded-full border border-[var(--color-border-strong)] bg-[var(--color-surface)] p-1 shadow-[0_4px_16px_-8px_oklch(0.18_0.01_270_/_0.25)]">

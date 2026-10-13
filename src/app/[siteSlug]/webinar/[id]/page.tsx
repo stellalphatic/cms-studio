@@ -80,6 +80,38 @@ export default async function WebinarRegistrationDetailPage({
             <FieldRow label="Payment status">
               <WebinarPaymentPill status={row.payment_status} />
             </FieldRow>
+            <FieldRow label="Pay reminder email">
+              <span className="capitalize">{row.unpaid_reminder_status ?? "—"}</span>
+              {row.unpaid_reminder_sent_at && (
+                <span className="ml-2 text-xs text-[var(--color-fg-muted)]">
+                  {formatDate(row.unpaid_reminder_sent_at, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+              {row.unpaid_reminder_error && (
+                <div className="mt-1 text-xs text-amber-700">{row.unpaid_reminder_error}</div>
+              )}
+            </FieldRow>
+            <FieldRow label="Zoom confirm email">
+              <span className="capitalize">{row.paid_confirmation_status ?? "—"}</span>
+              {row.paid_confirmation_sent_at && (
+                <span className="ml-2 text-xs text-[var(--color-fg-muted)]">
+                  {formatDate(row.paid_confirmation_sent_at, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </span>
+              )}
+              {row.paid_confirmation_error && (
+                <div className="mt-1 text-xs text-amber-700">{row.paid_confirmation_error}</div>
+              )}
+            </FieldRow>
             {row.paid_at && (
               <FieldRow label="Paid at">
                 {formatDate(row.paid_at, {
@@ -157,6 +189,8 @@ export default async function WebinarRegistrationDetailPage({
         id={row.id}
         initialNotes={row.notes ?? ""}
         paymentStatus={row.payment_status}
+        unpaidReminderStatus={row.unpaid_reminder_status ?? "pending"}
+        paidConfirmationStatus={row.paid_confirmation_status ?? "pending"}
       />
     </div>
   );

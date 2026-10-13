@@ -5,6 +5,11 @@ import { requireSiteAccess } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { voidMetaCapiEvent } from "@/lib/meta-capi";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import {
+  onWebinarMarkedPaid,
+  sendUnpaidReminderForRegistration,
+} from "@/lib/webinar-emails";
 import type { WebinarPaymentStatus } from "@/lib/webinar";
 
 function revalidateWebinar(siteSlug: string, id: string) {
@@ -133,6 +138,12 @@ export async function setWebinarPaymentStatus(
         order_id: row.stripe_checkout_session_id ?? row.id,
       },
     });
+    void onWebinarMarkedPaid({
+      sb: createSupabaseAdminClient(),
+      registrationId: id,
+    }).catch((err) => {
+      console.error("[webinar-emails] manual paid confirmation failed", id, err);
+    });
   }
 
   await logAudit({
@@ -148,4 +159,97 @@ export async function setWebinarPaymentStatus(
   });
 
   revalidateWebinar(siteSlug, id);
+}
+
+/** Retry unpaid payment reminder (resets to pending then sends now). */
+export async function retryUnpaidReminderEmail(siteSlug: string, id: string) {
+  const { ctx, site } = await requireSiteAccess(siteSlug);
+  const admin = createSupabaseAdminClient();
+
+  const { data: row } = await admin
+    .from("webinar_registrations")
+    .select("id, payment_status")
+    .eq("id", id)
+    .eq("site_id", site.id)
+    .maybeSingle<{ id: string; payment_status: WebinarPaymentStatus }>();
+  if (!row) throw new Error("Registration not found");
+  if (row.payment_status !== "unpaid") {
+    throw new Error("Lead is already paid; unpaid reminder is skipped");
+  }
+
+  await admin
+    .from("webinar_registrations")
+    .update({
+      unpaid_reminder_status: "pending",
+      unpaid_reminder_due_at: new Date().toISOString(),
+      unpaid_reminder_error: null,
+    })
+    .eq("id", id);
+
+  const result = await sendUnpaidReminderForRegistration(admin, id);
+
+  await logAudit({
+    site_id: site.id,
+    actor_id: ctx.user.id,
+    action: "update",
+    entity: "webinar_registrations",
+    entity_id: id,
+    diff: { unpaid_reminder_retry: result },
+  });
+
+  revalidateWebinar(siteSlug, id);
+  if (result === "failed") {
+    throw new Error("Reminder email failed — see error on this page");
+  }
+}
+
+/** Retry Zoom confirmation after a failed send (paid leads only). */
+export async function retryPaidConfirmationEmail(siteSlug: string, id: string) {
+  const { ctx, site } = await requireSiteAccess(siteSlug);
+  const admin = createSupabaseAdminClient();
+
+  const { data: row } = await admin
+    .from("webinar_registrations")
+    .select("id, payment_status")
+    .eq("id", id)
+    .eq("site_id", site.id)
+    .maybeSingle<{ id: string; payment_status: WebinarPaymentStatus }>();
+  if (!row) throw new Error("Registration not found");
+  if (row.payment_status !== "paid") {
+    throw new Error("Lead must be paid before sending Zoom confirmation");
+  }
+
+  await admin
+    .from("webinar_registrations")
+    .update({
+      paid_confirmation_status: "pending",
+      paid_confirmation_error: null,
+    })
+    .eq("id", id)
+    .neq("paid_confirmation_status", "sent");
+
+  await onWebinarMarkedPaid({ sb: admin, registrationId: id });
+
+  const { data: after } = await admin
+    .from("webinar_registrations")
+    .select("paid_confirmation_status, paid_confirmation_error")
+    .eq("id", id)
+    .maybeSingle<{
+      paid_confirmation_status: string;
+      paid_confirmation_error: string | null;
+    }>();
+
+  await logAudit({
+    site_id: site.id,
+    actor_id: ctx.user.id,
+    action: "update",
+    entity: "webinar_registrations",
+    entity_id: id,
+    diff: { paid_confirmation_retry: after?.paid_confirmation_status },
+  });
+
+  revalidateWebinar(siteSlug, id);
+  if (after?.paid_confirmation_status === "failed") {
+    throw new Error(after.paid_confirmation_error ?? "Confirmation email failed");
+  }
 }

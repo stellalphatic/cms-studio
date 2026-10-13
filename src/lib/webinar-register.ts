@@ -1,6 +1,10 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { voidMetaCapiEvent } from "@/lib/meta-capi";
 import {
+  onWebinarMarkedPaid,
+  onWebinarUnpaidCreated,
+} from "@/lib/webinar-emails";
+import {
   buildWebinarPaymentUrl,
   isValidEmail,
   type WebinarPaymentStatus,
@@ -114,6 +118,14 @@ export async function upsertUnpaidWebinarRegistration(args: {
     .from("form_submissions")
     .update({ payload: enrichedPayload })
     .eq("id", args.formSubmissionId);
+
+  // Schedule unpaid payment reminder (+ Brevo Leads sync). Fire-and-forget.
+  void onWebinarUnpaidCreated({
+    sb: args.sb,
+    registrationId,
+  }).catch((err) => {
+    console.error("[webinar-emails] unpaid schedule failed", registrationId, err);
+  });
 
   return {
     ok: true,
@@ -278,6 +290,14 @@ export async function markWebinarRegistrationPaid(args: {
       content_type: "product",
       order_id: args.checkoutSessionId,
     },
+  });
+
+  // Zoom confirmation email (idempotent). Fire-and-forget.
+  void onWebinarMarkedPaid({
+    sb: args.sb,
+    registrationId: row.id,
+  }).catch((err) => {
+    console.error("[webinar-emails] paid confirmation failed", row.id, err);
   });
 
   return { ok: true };

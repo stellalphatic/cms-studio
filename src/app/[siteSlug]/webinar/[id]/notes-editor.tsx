@@ -4,19 +4,29 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/input";
+import type { WebinarEmailStatus } from "@/lib/supabase/types";
 import type { WebinarPaymentStatus } from "@/lib/webinar";
-import { setWebinarPaymentStatus, updateWebinarNotes } from "../actions";
+import {
+  retryPaidConfirmationEmail,
+  retryUnpaidReminderEmail,
+  setWebinarPaymentStatus,
+  updateWebinarNotes,
+} from "../actions";
 
 export function WebinarNotesEditor({
   siteSlug,
   id,
   initialNotes,
   paymentStatus,
+  unpaidReminderStatus,
+  paidConfirmationStatus,
 }: {
   siteSlug: string;
   id: string;
   initialNotes: string;
   paymentStatus: WebinarPaymentStatus;
+  unpaidReminderStatus: WebinarEmailStatus;
+  paidConfirmationStatus: WebinarEmailStatus;
 }) {
   const [pending, start] = useTransition();
   const [notes, setNotes] = useState(initialNotes);
@@ -47,6 +57,28 @@ export function WebinarNotesEditor({
         );
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Update failed");
+      }
+    });
+  }
+
+  function retryUnpaid() {
+    start(async () => {
+      try {
+        await retryUnpaidReminderEmail(siteSlug, id);
+        toast.success("Payment reminder sent");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Send failed");
+      }
+    });
+  }
+
+  function retryPaid() {
+    start(async () => {
+      try {
+        await retryPaidConfirmationEmail(siteSlug, id);
+        toast.success("Zoom confirmation sent");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Send failed");
       }
     });
   }
@@ -92,6 +124,43 @@ export function WebinarNotesEditor({
               Mark unpaid
             </Button>
           </div>
+        )}
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+        <div>
+          <h3 className="text-sm font-semibold text-[var(--color-fg)]">Emails</h3>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--color-fg-muted)]">
+            Retry if status shows failed. Unpaid reminder waits ~15 minutes unless you send now.
+          </p>
+        </div>
+        {status === "unpaid" && unpaidReminderStatus !== "sent" && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={retryUnpaid}
+            disabled={pending}
+            className="w-full"
+          >
+            {pending ? "Sending…" : "Send payment reminder now"}
+          </Button>
+        )}
+        {status === "paid" && paidConfirmationStatus !== "sent" && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={retryPaid}
+            disabled={pending}
+            className="w-full"
+          >
+            {pending ? "Sending…" : "Send Zoom confirmation now"}
+          </Button>
+        )}
+        {((status === "unpaid" && unpaidReminderStatus === "sent") ||
+          (status === "paid" && paidConfirmationStatus === "sent")) && (
+          <p className="text-xs text-[var(--color-fg-muted)]">
+            Relevant emails already marked sent.
+          </p>
         )}
       </div>
 

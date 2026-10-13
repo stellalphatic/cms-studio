@@ -15,6 +15,12 @@ export type SubmissionStatus =
   | "spam";
 
 export type WebinarPaymentStatus = "unpaid" | "paid" | "refunded";
+export type WebinarEmailStatus =
+  | "pending"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "skipped";
 
 export interface Site {
   id: string;
@@ -37,6 +43,20 @@ export interface Site {
   allowed_origins: string[];
   turnstile_site_key: string | null;
   turnstile_secret_key: string | null;
+  brevo_api_key: string | null;
+  brevo_smtp_login: string | null;
+  brevo_smtp_key: string | null;
+  brevo_from_email: string | null;
+  brevo_from_name: string | null;
+  brevo_leads_list_id: string | null;
+  brevo_registered_list_id: string | null;
+  webinar_date_label: string | null;
+  webinar_local_time_label: string | null;
+  webinar_timezone: string | null;
+  webinar_zoom_url: string | null;
+  webinar_zoom_meeting_id: string | null;
+  webinar_zoom_passcode: string | null;
+  webinar_unpaid_reminder_minutes: number;
   created_at: string;
   updated_at: string;
 }
@@ -189,6 +209,14 @@ export interface WebinarRegistration {
   ip_address: string | null;
   user_agent: string | null;
   notes: string | null;
+  unpaid_reminder_status: WebinarEmailStatus;
+  unpaid_reminder_due_at: string | null;
+  unpaid_reminder_sent_at: string | null;
+  unpaid_reminder_error: string | null;
+  paid_confirmation_status: WebinarEmailStatus;
+  paid_confirmation_sent_at: string | null;
+  paid_confirmation_error: string | null;
+  brevo_contact_id: string | null;
   created_at: string;
   updated_at: string;
 }
