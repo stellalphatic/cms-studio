@@ -95,6 +95,11 @@ ${turnstileSiteKey ? `# Optional: Cloudflare Turnstile (CAPTCHA).\nNEXT_PUBLIC_T
 WEBINAR_STRIPE_PAYMENT_LINK=https://buy.stripe.com/4gMdR9fu1a1XfrN6vB3Je09
 STRIPE_WEBHOOK_SECRET=whsec_...   # from Stripe → Developers → Webhooks → Signing secret
 `;
+  const metaCapiEnv = `# Studio (CMS) Vercel only — Pixel stays on the public site (do not reinstall).
+META_PIXEL_ID=1000856715673214
+META_CAPI_ACCESS_TOKEN=...   # Events Manager → Pixel → Settings → Generate access token
+# META_TEST_EVENT_CODE=TESTxxxx   # Test Events tab only; remove after QA
+`;
 
   return (
     <div className="max-w-4xl space-y-10">
@@ -237,6 +242,32 @@ STRIPE_WEBHOOK_SECRET=whsec_...   # from Stripe → Developers → Webhooks → 
                 First-time DB setup: run{" "}
                 <code className="font-mono text-[11px]">supabase/migrations/0009_webinar_registrations.sql</code>{" "}
                 in the Supabase SQL editor (service-role keys cannot create tables).
+              </li>
+            </ul>
+          </div>
+        </Section>
+      )}
+
+      {site.slug === "kingsbridge" && (
+        <Section title="Meta CAPI · Lead + Purchase">
+          <div className="space-y-4 text-[13px] leading-relaxed text-[var(--color-fg-muted)]">
+            <p>
+              Existing Pixel <code className="font-mono text-[11px]">1000856715673214</code> stays on
+              the public site. CMS sends <b className="text-[var(--color-fg)]">Lead</b> when a form
+              saves, and <b className="text-[var(--color-fg)]">Purchase</b> when Stripe marks a
+              webinar seat paid.
+            </p>
+            <CopyBlock label="Studio Vercel env (CAPI)" value={metaCapiEnv} />
+            <ul className="list-disc space-y-1.5 pl-5">
+              <li>
+                Events Manager → Data sources → Pixel → Settings → Generate access token → paste into{" "}
+                <code className="font-mono text-[11px]">META_CAPI_ACCESS_TOKEN</code>.
+              </li>
+              <li>
+                QA: set <code className="font-mono text-[11px]">META_TEST_EVENT_CODE</code> from the
+                Test Events tab, run{" "}
+                <code className="font-mono text-[11px]">npx tsx scripts/test-meta-capi.ts</code>, then
+                remove the test code and redeploy.
               </li>
             </ul>
           </div>

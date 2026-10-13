@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Site } from "@/lib/supabase/types";
+import { voidMetaCapiEvent } from "@/lib/meta-capi";
 import { upsertUnpaidWebinarRegistration } from "@/lib/webinar-register";
 
 /**
@@ -37,6 +38,12 @@ interface SubmitBody {
   fields?: Record<string, unknown>;
   turnstileToken?: string;
   "cf-turnstile-response"?: string;
+  /** Browser Pixel cookies + shared event_id for CAPI↔Pixel dedup. */
+  meta?: {
+    fbp?: string;
+    fbc?: string;
+    event_id?: string;
+  };
 }
 
 export async function OPTIONS(req: NextRequest, ctx: { params: Promise<{ siteSlug: string }> }) {
@@ -198,7 +205,47 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
     });
   }
 
-  return json({ ok: true, id: row.id, ...(webinarExtra ?? {}) }, 201, cors);
+  // Kingsbridge: Meta CAPI Lead after the CMS row is committed (Pixel stays client-side).
+  if (site.slug === "kingsbridge") {
+    const leadEventId =
+      (typeof body.meta?.event_id === "string" && body.meta.event_id.trim()) ||
+      `lead_${row.id}`;
+    const email = String(sanitised.email ?? "").trim() || null;
+    const phone =
+      String(sanitised.whatsapp ?? sanitised.phone ?? "").trim() || null;
+    const name = String(sanitised.name ?? "").trim() || null;
+    voidMetaCapiEvent({
+      eventName: "Lead",
+      eventId: leadEventId,
+      eventSourceUrl: req.headers.get("referer") ?? req.headers.get("origin"),
+      email,
+      phone,
+      name,
+      ip,
+      userAgent: ua,
+      fbp: body.meta?.fbp ?? null,
+      fbc: body.meta?.fbc ?? null,
+      externalId: row.id,
+      customData: {
+        content_name: formName,
+        content_category: formName === "webinar_registration" ? "webinar" : "lead",
+        content_ids: [row.id],
+      },
+    });
+  }
+
+  return json(
+    {
+      ok: true,
+      id: row.id,
+      event_id:
+        (typeof body.meta?.event_id === "string" && body.meta.event_id.trim()) ||
+        `lead_${row.id}`,
+      ...(webinarExtra ?? {}),
+    },
+    201,
+    cors,
+  );
 }
 
 /**

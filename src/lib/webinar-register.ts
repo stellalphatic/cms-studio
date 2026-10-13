@@ -1,4 +1,5 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { voidMetaCapiEvent } from "@/lib/meta-capi";
 import {
   buildWebinarPaymentUrl,
   isValidEmail,
@@ -177,13 +178,21 @@ export async function markWebinarRegistrationPaid(args: {
 }): Promise<{ ok: true; already?: boolean } | { ok: false; error: string }> {
   const { data: row, error: fetchErr } = await args.sb
     .from("webinar_registrations")
-    .select("id, payment_status, form_submission_id, site_id")
+    .select(
+      "id, name, email, whatsapp, payment_status, form_submission_id, site_id, source_url, ip_address, user_agent",
+    )
     .eq("id", args.registrationId)
     .maybeSingle<{
       id: string;
+      name: string;
+      email: string;
+      whatsapp: string;
       payment_status: WebinarPaymentStatus;
       form_submission_id: string | null;
       site_id: string;
+      source_url: string | null;
+      ip_address: string | null;
+      user_agent: string | null;
     }>();
 
   if (fetchErr) return { ok: false, error: fetchErr.message };
@@ -204,6 +213,8 @@ export async function markWebinarRegistrationPaid(args: {
   }
 
   const paidAt = new Date().toISOString();
+  const currency = args.currency?.toLowerCase() ?? "cad";
+  const amountCents = args.amountCents;
   const { error: updateErr } = await args.sb
     .from("webinar_registrations")
     .update({
@@ -212,8 +223,8 @@ export async function markWebinarRegistrationPaid(args: {
       stripe_checkout_session_id: args.checkoutSessionId,
       stripe_payment_intent_id: args.paymentIntentId,
       stripe_customer_email: args.customerEmail,
-      amount_cents: args.amountCents,
-      currency: args.currency?.toLowerCase() ?? "cad",
+      amount_cents: amountCents,
+      currency,
     })
     .eq("id", row.id);
 
@@ -242,6 +253,32 @@ export async function markWebinarRegistrationPaid(args: {
         .eq("id", row.form_submission_id);
     }
   }
+
+  // Meta CAPI Purchase — only on unpaid → paid (Stripe webhook / confirmed pay).
+  const value =
+    typeof amountCents === "number" && Number.isFinite(amountCents)
+      ? amountCents / 100
+      : 1;
+  voidMetaCapiEvent({
+    eventName: "Purchase",
+    eventId: `purchase_${row.id}`,
+    eventSourceUrl: row.source_url ?? "https://kingsbridgeimmigration.ca/webinar",
+    email: args.customerEmail ?? row.email,
+    phone: row.whatsapp,
+    name: row.name,
+    ip: row.ip_address,
+    userAgent: row.user_agent,
+    externalId: row.id,
+    customData: {
+      value,
+      currency: currency.toUpperCase(),
+      content_name: "webinar_seat",
+      content_category: "webinar",
+      content_ids: [row.id],
+      content_type: "product",
+      order_id: args.checkoutSessionId,
+    },
+  });
 
   return { ok: true };
 }
