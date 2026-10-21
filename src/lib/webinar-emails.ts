@@ -101,29 +101,18 @@ RCIC Shabbeer (R535845)`;
 
 function paidConfirmationCopy(args: {
   firstName: string;
-  webinarDate: string;
-  localTime: string;
-  zoomUrl: string;
-  meetingId: string;
-  passcode: string;
 }): { subject: string; preheader: string; text: string; html: string } {
-  const subject = "You're registered: RCIC Shabbeer's webinar details";
-  const preheader = "Your seat is confirmed. Save the Zoom details below.";
+  // Date / Zoom not confirmed yet — payment receipt only; details follow later.
+  const subject = "Payment received: your webinar seat is reserved";
+  const preheader =
+    "Thanks for your $1 payment. We will email the webinar link and schedule soon.";
   const text = `Hi ${args.firstName},
 
-Your $1 payment has been confirmed and your seat is reserved for RCIC Shabbeer's webinar.
+Congratulations — your $1 payment has been received and your seat for RCIC Shabbeer's webinar is reserved.
 
-Webinar date: ${args.webinarDate}
-Time: ${args.localTime}
-Host time: October 21, 2026 at 12:30 PM America/Toronto
+The webinar date, time, and joining link are being finalized. Our team will email you the full details (including the Zoom link) as soon as they are confirmed. Please keep an eye on this inbox (and your spam folder).
 
-Join the Zoom meeting:
-${args.zoomUrl}
-
-Meeting ID: ${args.meetingId}
-Passcode: ${args.passcode}
-
-Please join a few minutes early. Keep this email so you can find the joining details when the webinar begins.
+If you have any questions in the meantime, reply to this email or contact Kingsbridge Immigration.
 
 Regards,
 Kingsbridge Immigration
@@ -133,15 +122,9 @@ RCIC Shabbeer (R535845)`;
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
   <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:28px 24px;">
     <p style="margin:0 0 16px;">Hi ${escapeHtml(args.firstName)},</p>
-    <p style="margin:0 0 16px;">Your $1 payment has been confirmed and your seat is reserved for RCIC Shabbeer&rsquo;s webinar.</p>
-    <p style="margin:0 0 8px;"><strong>Webinar date:</strong> ${escapeHtml(args.webinarDate)}<br/>
-    <strong>Time:</strong> ${escapeHtml(args.localTime)}<br/>
-    <strong>Host time:</strong> October 21, 2026 at 12:30 PM America/Toronto</p>
-    <p style="margin:16px 0 8px;"><strong>Join the Zoom meeting:</strong><br/>
-    <a href="${escapeHtml(args.zoomUrl)}" style="color:#b91c1c;">${escapeHtml(args.zoomUrl)}</a></p>
-    <p style="margin:0 0 16px;"><strong>Meeting ID:</strong> ${escapeHtml(args.meetingId)}<br/>
-    <strong>Passcode:</strong> ${escapeHtml(args.passcode)}</p>
-    <p style="margin:0 0 16px;">Please join a few minutes early. Keep this email so you can find the joining details when the webinar begins.</p>
+    <p style="margin:0 0 16px;">Congratulations &mdash; your <strong>$1 payment</strong> has been received and your seat for RCIC Shabbeer&rsquo;s webinar is reserved.</p>
+    <p style="margin:0 0 16px;">The webinar date, time, and joining link are being finalized. Our team will email you the full details (including the Zoom link) as soon as they are confirmed. Please keep an eye on this inbox (and your spam folder).</p>
+    <p style="margin:0 0 16px;">If you have any questions in the meantime, reply to this email or contact Kingsbridge Immigration.</p>
     <p style="margin:24px 0 0;">Regards,<br/>Kingsbridge Immigration<br/>RCIC Shabbeer (R535845)</p>
   </div>
 </body></html>`;
@@ -415,14 +398,7 @@ export async function onWebinarMarkedPaid(args: {
   if (!claimed) return;
 
   const firstName = firstNameFromFullName(claimed.name);
-  const copy = paidConfirmationCopy({
-    firstName,
-    webinarDate: cfg.webinarDate,
-    localTime: cfg.localTime,
-    zoomUrl: cfg.zoomUrl,
-    meetingId: cfg.zoomMeetingId,
-    passcode: cfg.zoomPasscode,
-  });
+  const copy = paidConfirmationCopy({ firstName });
 
   await upsertBrevoContact({
     cfg,
@@ -433,10 +409,8 @@ export async function onWebinarMarkedPaid(args: {
       FIRSTNAME: firstName === "there" ? undefined : firstName,
       CMS_LEAD_ID: claimed.id,
       PAYMENT_STATUS: "paid",
-      WEBINAR_DATE: cfg.webinarDate,
-      LOCAL_TIME: cfg.localTime,
-      ZOOM_LINK: cfg.zoomUrl,
-      WEBINAR_TIMEZONE: cfg.timezone,
+      // Date / Zoom withheld until confirmed — do not push placeholder links.
+      ZOOM_LINK: "",
     },
   });
 
