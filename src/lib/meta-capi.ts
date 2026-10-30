@@ -1,11 +1,24 @@
 /**
- * Meta Conversions API (CAPI) for Kingsbridge (new ads Pixel by default).
- * Purchase on Stripe paid. Browser Pixel stays on the public site.
+ * Meta Conversions API (CAPI) for Kingsbridge.
+ * Always targets BOTH Pixel IDs (new ads + legacy) — no Vercel env change required.
+ * Purchase on Stripe paid. Browser Pixel dual-inits the same two IDs on the public site.
  */
 
 import { createHash } from "node:crypto";
 
-export const DEFAULT_META_PIXEL_ID = "2614243202349882";
+/** New ads account Pixel. */
+export const META_PIXEL_ID_PRIMARY = "2614243202349882";
+/** Legacy ads Pixel — keep receiving CAPI + browser events. */
+export const META_PIXEL_ID_LEGACY = "1000856715673214";
+
+/** Both Pixels, always. Env META_PIXEL_ID is optional and only adds an extra ID. */
+export const DEFAULT_META_PIXEL_IDS: readonly string[] = [
+  META_PIXEL_ID_PRIMARY,
+  META_PIXEL_ID_LEGACY,
+];
+
+/** @deprecated Prefer META_PIXEL_ID_PRIMARY — kept for older imports. */
+export const DEFAULT_META_PIXEL_ID = META_PIXEL_ID_PRIMARY;
 
 type MetaUserData = {
   em?: string[];
@@ -47,7 +60,7 @@ export type MetaCapiEventInput = {
 };
 
 export type MetaCapiResult =
-  | { ok: true; events_received: number; fbtrace_id?: string; skipped?: never }
+  | { ok: true; events_received: number; fbtrace_id?: string; skipped?: never; pixel_ids?: string[] }
   | { ok: true; skipped: string }
   | { ok: false; error: string; status?: number; body?: string };
 
@@ -83,8 +96,17 @@ function splitName(name: string | null | undefined): { fn?: string[]; ln?: strin
   return { fn, ln: [sha256(parts[parts.length - 1]!)] };
 }
 
+/** Pixel IDs that receive every CAPI event (both hardcoded; env can add one more). */
+export function metaPixelIds(): string[] {
+  const ids = new Set<string>(DEFAULT_META_PIXEL_IDS);
+  const fromEnv = (process.env.META_PIXEL_ID ?? "").trim();
+  if (fromEnv) ids.add(fromEnv);
+  return Array.from(ids);
+}
+
+/** Primary Pixel for display / scripts. */
 export function metaPixelId(): string {
-  return (process.env.META_PIXEL_ID ?? DEFAULT_META_PIXEL_ID).trim() || DEFAULT_META_PIXEL_ID;
+  return metaPixelIds()[0] ?? META_PIXEL_ID_PRIMARY;
 }
 
 export function metaCapiConfigured(): boolean {
@@ -96,13 +118,63 @@ function testEventCode(): string | undefined {
   return code || undefined;
 }
 
+async function postToPixel(
+  pixelId: string,
+  token: string,
+  body: Record<string, unknown>,
+  eventName: string,
+): Promise<MetaCapiResult> {
+  const url = `https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${encodeURIComponent(token)}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const text = await res.text();
+    let parsed: { events_received?: number; fbtrace_id?: string; error?: { message?: string } } = {};
+    try {
+      parsed = JSON.parse(text) as typeof parsed;
+    } catch {
+      // keep raw text
+    }
+
+    if (!res.ok) {
+      console.error("[meta-capi]", eventName, pixelId, res.status, text.slice(0, 500));
+      return {
+        ok: false,
+        error: parsed.error?.message ?? `http_${res.status}`,
+        status: res.status,
+        body: text.slice(0, 800),
+      };
+    }
+
+    return {
+      ok: true,
+      events_received: parsed.events_received ?? 0,
+      fbtrace_id: parsed.fbtrace_id,
+      pixel_ids: [pixelId],
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "fetch_failed";
+    console.error("[meta-capi]", eventName, pixelId, message);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Sends the event to every configured Pixel ID in parallel.
+ * Succeeds if at least one Pixel accepts the event (so a token scoped to
+ * only one ads account still keeps that Pixel working).
+ */
 export async function sendMetaCapiEvent(input: MetaCapiEventInput): Promise<MetaCapiResult> {
   const token = (process.env.META_CAPI_ACCESS_TOKEN ?? "").trim();
   if (!token) {
     return { ok: true, skipped: "meta_capi_not_configured" };
   }
 
-  const pixelId = metaPixelId();
+  const pixelIds = metaPixelIds();
   const { fn, ln } = splitName(input.name);
   const userData: MetaUserData = {
     em: hashIfPresent(input.email, normalizeEmail),
@@ -136,42 +208,37 @@ export async function sendMetaCapiEvent(input: MetaCapiEventInput): Promise<Meta
   const testCode = testEventCode();
   if (testCode) body.test_event_code = testCode;
 
-  const url = `https://graph.facebook.com/v21.0/${pixelId}/events?access_token=${encodeURIComponent(token)}`;
+  const results = await Promise.all(
+    pixelIds.map((pixelId) => postToPixel(pixelId, token, body, input.eventName)),
+  );
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const text = await res.text();
-    let parsed: { events_received?: number; fbtrace_id?: string; error?: { message?: string } } = {};
-    try {
-      parsed = JSON.parse(text) as typeof parsed;
-    } catch {
-      // keep raw text
-    }
+  const successes = results.filter((r): r is Extract<MetaCapiResult, { ok: true; events_received: number }> =>
+    r.ok && !("skipped" in r && r.skipped),
+  );
+  const failures = results.filter((r) => !r.ok);
 
-    if (!res.ok) {
-      console.error("[meta-capi]", input.eventName, res.status, text.slice(0, 500));
-      return {
-        ok: false,
-        error: parsed.error?.message ?? `http_${res.status}`,
-        status: res.status,
-        body: text.slice(0, 800),
-      };
-    }
-
-    return {
-      ok: true,
-      events_received: parsed.events_received ?? 0,
-      fbtrace_id: parsed.fbtrace_id,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "fetch_failed";
-    console.error("[meta-capi]", input.eventName, message);
-    return { ok: false, error: message };
+  if (successes.length === 0) {
+    const first = failures[0];
+    return first ?? { ok: false, error: "all_pixels_failed" };
   }
+
+  for (const fail of failures) {
+    if (!fail.ok) {
+      console.error(
+        "[meta-capi] partial failure",
+        input.eventName,
+        input.eventId,
+        fail.error,
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    events_received: successes.reduce((sum, r) => sum + (r.events_received ?? 0), 0),
+    fbtrace_id: successes[0]?.fbtrace_id,
+    pixel_ids: successes.flatMap((r) => r.pixel_ids ?? []),
+  };
 }
 
 /** Fire-and-forget wrapper — never throws into the request path. */

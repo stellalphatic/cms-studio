@@ -96,13 +96,14 @@ That's the entire onboarding loop for novel content shapes.
 ## Kingsbridge Meta (Lead browser + Purchase CAPI)
 
 Public site dual-inits Pixel `2614243202349882` (primary) and legacy `1000856715673214`.
+CMS CAPI also posts to both IDs in code (no env change required).
 
 - **Lead** — browser Pixel, only after CMS `submit-form` returns 2xx (not on button click).
 - **Purchase** — CMS Conversions API when Stripe marks a webinar seat paid.
 
 Studio env (Purchase CAPI):
 
-- `META_PIXEL_ID=2614243202349882`
+- `META_CAPI_ACCESS_TOKEN=…` (required for Purchase). Both Pixel IDs are hardcoded; `META_PIXEL_ID` is optional.
 - `META_CAPI_ACCESS_TOKEN=...` (Events Manager → Pixel → Settings → Generate access token)
 - Optional QA: `META_TEST_EVENT_CODE=TESTxxxx` then remove after Test Events pass
 

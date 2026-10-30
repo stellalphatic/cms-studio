@@ -1,17 +1,22 @@
 /**
- * Send Lead + Purchase to Meta Test Events for Pixel 1000856715673214.
+ * Send Lead + Purchase to Meta Test Events for BOTH Kingsbridge Pixels.
  *
  * Requires in studio/.env (or process env):
  *   META_CAPI_ACCESS_TOKEN=...
  *   META_TEST_EVENT_CODE=TESTxxxx   # from Events Manager → Test Events
- *   META_PIXEL_ID=1000856715673214  # optional, defaults
+ *
+ * Both Pixel IDs are hardcoded (2614243202349882 + 1000856715673214).
  *
  * Usage: npx tsx scripts/test-meta-capi.ts
  */
 
 import { config } from "dotenv";
 import { resolve } from "node:path";
-import { sendMetaCapiEvent, metaCapiConfigured, metaPixelId } from "../src/lib/meta-capi";
+import {
+  sendMetaCapiEvent,
+  metaCapiConfigured,
+  metaPixelIds,
+} from "../src/lib/meta-capi";
 
 config({ path: resolve(process.cwd(), ".env") });
 
@@ -29,8 +34,8 @@ async function main() {
 
   const stamp = Date.now();
   const email = `capi-test+${stamp}@kingsbridgeimmigration.ca`;
-  const pixel = metaPixelId();
-  console.log("Pixel:", pixel);
+  const pixels = metaPixelIds();
+  console.log("Pixels:", pixels.join(", "));
   console.log("Test code:", process.env.META_TEST_EVENT_CODE);
   console.log("Email:", email);
 
@@ -79,7 +84,7 @@ async function main() {
     console.error("Lead skipped:", lead.skipped);
     process.exit(1);
   }
-  console.log("\nCheck Meta Events Manager → Test Events for Lead + Purchase (server).");
+  console.log("OK — check Test Events for both Pixels.");
 }
 
 main().catch((err) => {
