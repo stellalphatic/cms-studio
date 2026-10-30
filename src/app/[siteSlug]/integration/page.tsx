@@ -96,7 +96,7 @@ WEBINAR_STRIPE_PAYMENT_LINK=https://buy.stripe.com/4gMdR9fu1a1XfrN6vB3Je09
 STRIPE_WEBHOOK_SECRET=whsec_...   # from Stripe → Developers → Webhooks → Signing secret
 `;
   const metaCapiEnv = `# Studio (CMS) Vercel — Purchase CAPI only (Lead = browser Pixel after CMS 2xx).
-META_PIXEL_ID=1000856715673214
+META_PIXEL_ID=2614243202349882
 META_CAPI_ACCESS_TOKEN=...   # Events Manager → Pixel → Settings → Generate access token
 # META_TEST_EVENT_CODE=TESTxxxx   # Test Events tab only; remove after QA
 `;
@@ -252,11 +252,12 @@ META_CAPI_ACCESS_TOKEN=...   # Events Manager → Pixel → Settings → Generat
         <Section title="Meta CAPI · Lead + Purchase">
           <div className="space-y-4 text-[13px] leading-relaxed text-[var(--color-fg-muted)]">
             <p>
-              Existing Pixel <code className="font-mono text-[11px]">1000856715673214</code> stays on
-              the public site (do not reinstall).{" "}
-              <b className="text-[var(--color-fg)]">Lead</b> fires from the browser Pixel only after
-              CMS returns success. <b className="text-[var(--color-fg)]">Purchase</b> is CAPI from the
-              Stripe webhook when the seat becomes paid.
+              Browser dual-inits Pixel{" "}
+              <code className="font-mono text-[11px]">2614243202349882</code> (primary) and legacy{" "}
+              <code className="font-mono text-[11px]">1000856715673214</code>. CAPI should use the
+              primary ID. <b className="text-[var(--color-fg)]">Lead</b> fires from the browser Pixel
+              only after CMS returns success. <b className="text-[var(--color-fg)]">Purchase</b> is
+              CAPI from the Stripe webhook when a $1 seat becomes paid (not on free registrations).
             </p>
             <CopyBlock label="Studio Vercel env (CAPI)" value={metaCapiEnv} />
             <ul className="list-disc space-y-1.5 pl-5">

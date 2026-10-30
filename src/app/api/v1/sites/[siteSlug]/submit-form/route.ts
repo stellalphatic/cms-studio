@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { Site } from "@/lib/supabase/types";
-import { upsertUnpaidWebinarRegistration } from "@/lib/webinar-register";
+import {
+  isFreeWebinarPayload,
+  upsertFreeWebinarRegistration,
+  upsertUnpaidWebinarRegistration,
+} from "@/lib/webinar-register";
 
 /**
  * Public form-submission endpoint, on the CMS URL.
@@ -146,19 +150,28 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
     return json({ error: insertErr?.message ?? "insert_failed" }, 500, cors);
   }
 
-  // Kingsbridge webinar: also create an unpaid seat row and return the Stripe
-  // Payment Link so the public site can redirect the registrant to pay $1.
+  // Kingsbridge webinar: unpaid+$1 Stripe redirect, or free A/B (no payment).
   let webinarExtra: Record<string, unknown> | null = null;
   if (formName === "webinar_registration") {
-    const webinar = await upsertUnpaidWebinarRegistration({
-      sb,
-      siteId: site.id,
-      formSubmissionId: row.id,
-      payload: sanitised,
-      sourceUrl: req.headers.get("referer") ?? null,
-      ip,
-      userAgent: ua,
-    });
+    const webinar = isFreeWebinarPayload(sanitised)
+      ? await upsertFreeWebinarRegistration({
+          sb,
+          siteId: site.id,
+          formSubmissionId: row.id,
+          payload: sanitised,
+          sourceUrl: req.headers.get("referer") ?? null,
+          ip,
+          userAgent: ua,
+        })
+      : await upsertUnpaidWebinarRegistration({
+          sb,
+          siteId: site.id,
+          formSubmissionId: row.id,
+          payload: sanitised,
+          sourceUrl: req.headers.get("referer") ?? null,
+          ip,
+          userAgent: ua,
+        });
     if (!webinar.ok) {
       // Roll back the inbox row so we don't leave unpaid form noise without a seat.
       await sb.from("form_submissions").delete().eq("id", row.id);
@@ -168,9 +181,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
       registration_id: webinar.registration_id,
       payment_status: webinar.payment_status,
       payment_url: webinar.payment_url,
+      pricing: webinar.pricing ?? "paid",
     };
     sanitised.registration_id = webinar.registration_id;
     sanitised.payment_status = webinar.payment_status;
+    sanitised.pricing = webinar.pricing ?? "paid";
   }
 
   // Fire-and-forget email. Per-site Resend overrides platform default.
@@ -197,7 +212,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ siteSlug: 
       to: notifyList,
       subject:
         formName === "webinar_registration"
-          ? `New webinar reservation (unpaid) · ${site.slug}`
+          ? isFreeWebinarPayload(sanitised)
+            ? `New FREE webinar registration · ${site.slug}`
+            : `New webinar reservation (unpaid) · ${site.slug}`
           : `New ${formName} submission · ${site.slug}`,
       payload: sanitised,
       origin: req.headers.get("origin") ?? site.slug,

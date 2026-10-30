@@ -1,11 +1,11 @@
 /**
- * Meta Conversions API (CAPI) for Kingsbridge Pixel 1000856715673214.
- * Server-side Lead (form save) + Purchase (Stripe paid). Does not touch Pixel install.
+ * Meta Conversions API (CAPI) for Kingsbridge (new ads Pixel by default).
+ * Purchase on Stripe paid. Browser Pixel stays on the public site.
  */
 
 import { createHash } from "node:crypto";
 
-export const DEFAULT_META_PIXEL_ID = "1000856715673214";
+export const DEFAULT_META_PIXEL_ID = "2614243202349882";
 
 type MetaUserData = {
   em?: string[];

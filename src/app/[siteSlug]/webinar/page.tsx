@@ -97,7 +97,7 @@ export default async function WebinarRegistrationsPage({
     <div>
       <PageHeader
         title="Webinar registrations"
-        description="Every $1 seat reservation — unpaid until Stripe confirms payment."
+        description="Seat reservations from $1 and free A/B landings. Filter by variant (long / short / free)."
         action={
           <a href={`/${siteSlug}/webinar/export?${exportParams.toString()}`}>
             <Button variant="secondary">

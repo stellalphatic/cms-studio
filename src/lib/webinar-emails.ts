@@ -31,6 +31,8 @@ type RegistrationEmailRow = {
   unpaid_reminder_status: WebinarEmailStatus;
   unpaid_reminder_due_at: string | null;
   paid_confirmation_status: WebinarEmailStatus;
+  amount_cents?: number | null;
+  landing_variant?: string | null;
 };
 
 const SITE_MAIL_SELECT =
@@ -101,8 +103,39 @@ RCIC Shabbeer (R535845)`;
 
 function paidConfirmationCopy(args: {
   firstName: string;
+  isFree?: boolean;
 }): { subject: string; preheader: string; text: string; html: string } {
-  // Date / Zoom not confirmed yet — payment receipt only; details follow later.
+  // Date / Zoom not confirmed yet — receipt / free confirm only; details follow later.
+  if (args.isFree) {
+    const subject = "You're registered: free webinar seat confirmed";
+    const preheader =
+      "Your free seat is reserved. We will email the webinar link and schedule soon.";
+    const text = `Hi ${args.firstName},
+
+You're registered — your free seat for RCIC Shabbeer's webinar is confirmed.
+
+The webinar date, time, and joining link are being finalized. Our team will email you the full details (including the Zoom link) as soon as they are confirmed. Please keep an eye on this inbox (and your spam folder).
+
+If you have any questions in the meantime, reply to this email or contact Kingsbridge Immigration.
+
+Regards,
+Kingsbridge Immigration
+RCIC Shabbeer (R535845)`;
+
+    const html = `<!DOCTYPE html><html><body style="font-family:Georgia,serif;line-height:1.55;color:#0f172a;background:#f8fafc;padding:24px;">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(preheader)}</div>
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:28px 24px;">
+    <p style="margin:0 0 16px;">Hi ${escapeHtml(args.firstName)},</p>
+    <p style="margin:0 0 16px;">You&rsquo;re registered &mdash; your <strong>free seat</strong> for RCIC Shabbeer&rsquo;s webinar is confirmed.</p>
+    <p style="margin:0 0 16px;">The webinar date, time, and joining link are being finalized. Our team will email you the full details (including the Zoom link) as soon as they are confirmed. Please keep an eye on this inbox (and your spam folder).</p>
+    <p style="margin:0 0 16px;">If you have any questions in the meantime, reply to this email or contact Kingsbridge Immigration.</p>
+    <p style="margin:24px 0 0;">Regards,<br/>Kingsbridge Immigration<br/>RCIC Shabbeer (R535845)</p>
+  </div>
+</body></html>`;
+
+    return { subject, preheader, text, html };
+  }
+
   const subject = "Payment received: your webinar seat is reserved";
   const preheader =
     "Thanks for your $1 payment. We will email the webinar link and schedule soon.";
@@ -346,7 +379,7 @@ export async function onWebinarMarkedPaid(args: {
   const { data: row } = await args.sb
     .from("webinar_registrations")
     .select(
-      "id, site_id, name, email, payment_status, unpaid_reminder_status, unpaid_reminder_due_at, paid_confirmation_status",
+      "id, site_id, name, email, payment_status, unpaid_reminder_status, unpaid_reminder_due_at, paid_confirmation_status, amount_cents, landing_variant",
     )
     .eq("id", args.registrationId)
     .maybeSingle<RegistrationEmailRow>();
@@ -362,6 +395,10 @@ export async function onWebinarMarkedPaid(args: {
   }
 
   if (row.paid_confirmation_status === "sent") return;
+
+  const isFree =
+    row.landing_variant === "free" ||
+    row.amount_cents === 0;
 
   const site = await loadSiteMail(args.sb, row.site_id);
   const cfg = resolveWebinarMailConfig(site);
@@ -398,7 +435,7 @@ export async function onWebinarMarkedPaid(args: {
   if (!claimed) return;
 
   const firstName = firstNameFromFullName(claimed.name);
-  const copy = paidConfirmationCopy({ firstName });
+  const copy = paidConfirmationCopy({ firstName, isFree });
 
   await upsertBrevoContact({
     cfg,
@@ -408,7 +445,8 @@ export async function onWebinarMarkedPaid(args: {
     attributes: {
       FIRSTNAME: firstName === "there" ? undefined : firstName,
       CMS_LEAD_ID: claimed.id,
-      PAYMENT_STATUS: "paid",
+      PAYMENT_STATUS: isFree ? "free" : "paid",
+      LANDING_VARIANT: row.landing_variant ?? undefined,
       // Date / Zoom withheld until confirmed — do not push placeholder links.
       ZOOM_LINK: "",
     },
@@ -421,7 +459,7 @@ export async function onWebinarMarkedPaid(args: {
     subject: copy.subject,
     htmlContent: copy.html,
     textContent: copy.text,
-    tags: ["webinar-paid-confirmation"],
+    tags: [isFree ? "webinar-free-confirmation" : "webinar-paid-confirmation"],
   });
 
   if (!send.ok) {

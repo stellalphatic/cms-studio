@@ -55,8 +55,9 @@ export function WebinarFilterBar({
         className="w-44"
       >
         <option value="">All variants</option>
-        <option value="long">Long (/webinar)</option>
-        <option value="short">Short (/shabbeers-webinar)</option>
+        <option value="long">Long (/webinar · $1)</option>
+        <option value="short">Short (/shabbeers-webinar · $1)</option>
+        <option value="free">Free (/shabbeer-free-webinar)</option>
       </Select>
     </div>
   );

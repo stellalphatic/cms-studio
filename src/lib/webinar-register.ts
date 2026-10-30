@@ -18,8 +18,30 @@ export type WebinarRegisterResult =
       registration_id: string;
       payment_status: WebinarPaymentStatus;
       payment_url: string;
+      pricing?: "paid" | "free";
     }
   | { ok: false; error: string; status: number };
+
+function parseWebinarFields(payload: Record<string, unknown>) {
+  const name = String(payload.name ?? "").trim();
+  const email = String(payload.email ?? "")
+    .trim()
+    .toLowerCase();
+  const whatsapp = String(payload.whatsapp ?? "").trim();
+  const source = String(payload.source ?? "").trim() || null;
+  const landingVariant = String(payload.landing_variant ?? "").trim() || null;
+  return { name, email, whatsapp, source, landingVariant };
+}
+
+export function isFreeWebinarPayload(payload: Record<string, unknown>): boolean {
+  const pricing = String(payload.pricing ?? "")
+    .trim()
+    .toLowerCase();
+  const variant = String(payload.landing_variant ?? "")
+    .trim()
+    .toLowerCase();
+  return pricing === "free" || variant === "free";
+}
 
 /**
  * Creates (or reuses unpaid) webinar registration after a form_submissions insert.
@@ -34,13 +56,9 @@ export async function upsertUnpaidWebinarRegistration(args: {
   ip: string | null;
   userAgent: string | null;
 }): Promise<WebinarRegisterResult> {
-  const name = String(args.payload.name ?? "").trim();
-  const email = String(args.payload.email ?? "")
-    .trim()
-    .toLowerCase();
-  const whatsapp = String(args.payload.whatsapp ?? "").trim();
-  const source = String(args.payload.source ?? "").trim() || null;
-  const landingVariant = String(args.payload.landing_variant ?? "").trim() || null;
+  const { name, email, whatsapp, source, landingVariant } = parseWebinarFields(
+    args.payload,
+  );
 
   if (!name || !email || !whatsapp) {
     return { ok: false, error: "missing_fields", status: 400 };
@@ -113,6 +131,7 @@ export async function upsertUnpaidWebinarRegistration(args: {
     whatsapp,
     registration_id: registrationId,
     payment_status: "unpaid" as const,
+    pricing: "paid" as const,
   };
   await args.sb
     .from("form_submissions")
@@ -135,6 +154,136 @@ export async function upsertUnpaidWebinarRegistration(args: {
     registration_id: registrationId,
     payment_status: "unpaid",
     payment_url: buildWebinarPaymentUrl(registrationId, email),
+    pricing: "paid",
+  };
+}
+
+/**
+ * Free webinar A/B landing: same CMS seat row, no Stripe.
+ * Confirmed immediately (amount $0) and sends the “details soon” email.
+ */
+export async function upsertFreeWebinarRegistration(args: {
+  sb: AdminClient;
+  siteId: string;
+  formSubmissionId: string;
+  payload: Record<string, unknown>;
+  sourceUrl: string | null;
+  ip: string | null;
+  userAgent: string | null;
+}): Promise<WebinarRegisterResult> {
+  const { name, email, whatsapp, source } = parseWebinarFields(args.payload);
+  const landingVariant = "free";
+
+  if (!name || !email || !whatsapp) {
+    return { ok: false, error: "missing_fields", status: 400 };
+  }
+  if (!isValidEmail(email)) {
+    return { ok: false, error: "invalid_email", status: 400 };
+  }
+
+  const paidAt = new Date().toISOString();
+
+  // Prefer updating an existing unpaid seat for this email (abandon $1 → free).
+  const { data: existingUnpaid } = await args.sb
+    .from("webinar_registrations")
+    .select("id")
+    .eq("site_id", args.siteId)
+    .eq("email", email)
+    .eq("payment_status", "unpaid")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>();
+
+  let registrationId: string;
+
+  if (existingUnpaid?.id) {
+    const { error } = await args.sb
+      .from("webinar_registrations")
+      .update({
+        name,
+        whatsapp,
+        source: source ?? "webinar-free",
+        landing_variant: landingVariant,
+        form_submission_id: args.formSubmissionId,
+        source_url: args.sourceUrl,
+        ip_address: args.ip,
+        user_agent: args.userAgent,
+        payment_status: "paid",
+        paid_at: paidAt,
+        amount_cents: 0,
+        currency: "cad",
+        unpaid_reminder_status: "skipped",
+        unpaid_reminder_error: null,
+      })
+      .eq("id", existingUnpaid.id);
+    if (error) {
+      return { ok: false, error: error.message, status: 500 };
+    }
+    registrationId = existingUnpaid.id;
+  } else {
+    const { data: created, error } = await args.sb
+      .from("webinar_registrations")
+      .insert({
+        site_id: args.siteId,
+        form_submission_id: args.formSubmissionId,
+        name,
+        email,
+        whatsapp,
+        source: source ?? "webinar-free",
+        landing_variant: landingVariant,
+        payment_status: "paid",
+        paid_at: paidAt,
+        amount_cents: 0,
+        currency: "cad",
+        unpaid_reminder_status: "skipped",
+        source_url: args.sourceUrl,
+        ip_address: args.ip,
+        user_agent: args.userAgent,
+      })
+      .select("id")
+      .single<{ id: string }>();
+
+    if (error || !created) {
+      return { ok: false, error: error?.message ?? "insert_failed", status: 500 };
+    }
+    registrationId = created.id;
+  }
+
+  const enrichedPayload = {
+    ...args.payload,
+    name,
+    email,
+    whatsapp,
+    registration_id: registrationId,
+    payment_status: "paid" as const,
+    pricing: "free" as const,
+    landing_variant: landingVariant,
+    paid_at: paidAt,
+    amount_cents: 0,
+  };
+  await args.sb
+    .from("form_submissions")
+    .update({
+      payload: enrichedPayload,
+      status: "contacted",
+    })
+    .eq("id", args.formSubmissionId);
+
+  try {
+    await onWebinarMarkedPaid({
+      sb: args.sb,
+      registrationId,
+    });
+  } catch (err) {
+    console.error("[webinar-emails] free confirmation failed", registrationId, err);
+  }
+
+  return {
+    ok: true,
+    registration_id: registrationId,
+    payment_status: "paid",
+    payment_url: "",
+    pricing: "free",
   };
 }
 
